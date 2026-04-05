@@ -1,4 +1,4 @@
-import { generateText } from './ai'
+import { generateText, parseLLMJson } from './ai'
 import type { AIProvider } from './ai'
 
 const WEB_AUDIT_PROMPT = `Eres un auditor técnico de webs de negocios locales.
@@ -101,16 +101,7 @@ export async function auditWebsite(
     maxTokens: 1024,
   })
 
-  // Parse JSON from the response (handle possible markdown wrappers)
-  let jsonStr = response.trim()
-  if (jsonStr.startsWith('```')) {
-    jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
-  }
-
-  try {
-    const result = JSON.parse(jsonStr) as WebAuditResult
-    return result
-  } catch {
-    throw new Error('El análisis no devolvió un JSON válido. Intenta de nuevo.')
-  }
+  const result = parseLLMJson<WebAuditResult>(response)
+  if (!result) throw new Error('El análisis no devolvió un JSON válido. Intenta de nuevo.')
+  return result
 }

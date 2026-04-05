@@ -59,8 +59,7 @@ Responde SOLO con el JSON, sin explicaciones ni markdown.`
 
 function buildKitPrompt(lead: LeadWithBusiness, tab: TabKey, ragContext: string): string {
   const b = lead.business
-  // SEC: sanitize all user-controlled fields before embedding in the prompt.
-  // XML delimiters signal to the model that the content is data, not instructions.
+  // XML delimiters signal data vs instructions (prompt injection defense)
   const name    = sanitizeForPrompt(b.name, 200)
   const sector  = sanitizeForPrompt(b.sector, 100)
   const address = sanitizeForPrompt(b.address ?? 'desconocida', 300)
@@ -88,6 +87,12 @@ ${ratingLine}
 <notes>${notes || 'sin notas'}</notes>${ragSection}`
 }
 
+// Maps tab key to knowledge_base category — keeps the stringly-typed value in one place
+const RAG_CATEGORY: Record<TabKey, string> = {
+  agent: 'agent_template',
+  web: 'web_template',
+}
+
 // Direct sector/category filtering (Groq removed embedding models as of 2026-04)
 // When an embedding provider is available, switch back to match_knowledge_base RPC
 async function queryRAG(sector: string, category: string): Promise<string> {
@@ -110,7 +115,7 @@ async function queryRAG(sector: string, category: string): Promise<string> {
  * when an LLM appends prose after the JSON object (e.g. "Here is your kit:
  * {...} Note: {something}"). The counter stops at the first balanced '}'.
  */
-function extractFirstJsonObject(text: string): string | null {
+export function extractFirstJsonObject(text: string): string | null {
   const start = text.indexOf('{')
   if (start === -1) return null
   let depth = 0
@@ -221,7 +226,7 @@ export default function Kit() {
     try {
       const ragContext = await queryRAG(
         selectedLead.business.sector,
-        tab === 'agent' ? 'agent_template' : 'web_template',
+        RAG_CATEGORY[tab],
       )
       const prompt = buildKitPrompt(selectedLead, tab, ragContext)
       const systemPrompt = tab === 'agent' ? AGENT_SYSTEM_PROMPT : WEB_SYSTEM_PROMPT

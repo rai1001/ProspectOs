@@ -10,21 +10,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-
-// Mirror of extractFirstJsonObject from Kit.tsx (not exported — tested inline)
-function extractFirstJsonObject(text: string): string | null {
-  const start = text.indexOf('{')
-  if (start === -1) return null
-  let depth = 0
-  for (let i = start; i < text.length; i++) {
-    if (text[i] === '{') depth++
-    else if (text[i] === '}') {
-      depth--
-      if (depth === 0) return text.slice(start, i + 1)
-    }
-  }
-  return null
-}
+import { extractFirstJsonObject } from '../src/pages/Kit'
 
 function parseKitJSON(text: string): Record<string, unknown> | null {
   try {

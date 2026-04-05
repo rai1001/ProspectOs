@@ -39,8 +39,9 @@ export default function Settings() {
 
   const handleRecalculate = async () => {
     setRecalculating(true)
-    await recalculateScores()
-    toast.success('Scores recalculados')
+    const { error } = await recalculateScores()
+    if (error) toast.error(`Error al recalcular: ${error}`)
+    else toast.success('Scores recalculados')
     setRecalculating(false)
   }
 

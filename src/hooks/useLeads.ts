@@ -85,16 +85,20 @@ export function useLeads() {
     setLeads(prev => prev.filter(l => l.id !== id))
   }
 
-  const recalculateScores = async () => {
-    if (!rules.length || !leads.length) return
+  const recalculateScores = async (): Promise<{ error: string | null }> => {
+    if (!rules.length || !leads.length) return { error: null }
     const updates = leads.map(l => ({
       id: l.id,
       score: calculateScore(l.business, rules),
     }))
     // Batch upsert: single SQL statement instead of N sequential round-trips.
     // Supabase translates this to INSERT ... ON CONFLICT (id) DO UPDATE SET score = EXCLUDED.score
-    await supabase.from('leads').upsert(updates, { onConflict: 'id' })
-    await fetchLeads()
+    const { error } = await supabase.from('leads').upsert(updates, { onConflict: 'id' })
+    if (error) return { error: error.message }
+    // Update local state without re-fetching all rows from the DB
+    const scoreMap = new Map(updates.map(u => [u.id, u.score]))
+    setLeads(prev => prev.map(l => ({ ...l, score: scoreMap.get(l.id) ?? l.score })))
+    return { error: null }
   }
 
   return { leads, loading, addBusinessAndLead, updateLead, deleteLead, recalculateScores, refetch: fetchLeads }

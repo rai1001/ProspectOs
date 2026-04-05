@@ -3,29 +3,7 @@ import { ScanSearch, Loader2, AlertTriangle, CheckCircle2, XCircle, Zap } from '
 import { cn } from '../lib/cn'
 import { auditWebsite, type WebAuditResult } from '../utils/audit'
 import { supabase } from '../lib/supabase'
-
-// Basic URL validation: must look like a domain, block private/internal ranges
-function isValidPublicUrl(input: string): boolean {
-  try {
-    const u = new URL(input.startsWith('http') ? input : `https://${input}`)
-    if (!['http:', 'https:'].includes(u.protocol)) return false
-    // Block private/internal hostnames
-    const host = u.hostname.toLowerCase()
-    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') return false
-    if (host.startsWith('10.') || host.startsWith('192.168.') || host.startsWith('172.')) return false
-    if (host === '169.254.169.254') return false // AWS metadata
-    if (!host.includes('.')) return false // must have at least one dot
-    return true
-  } catch {
-    return false
-  }
-}
-
-// Spanish phone: 6xx or 7xx (9 digits), optionally with +34 prefix
-function isValidSpanishPhone(phone: string): boolean {
-  const clean = phone.replace(/[\s\-()]/g, '')
-  return /^(\+34)?[67]\d{8}$/.test(clean)
-}
+import { isValidPublicUrl, isValidSpanishPhone } from '../utils/validation'
 
 // Client-side throttle: max 1 audit per 30s, max 1 lead submit per session
 let lastAuditTime = 0

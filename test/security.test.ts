@@ -1,31 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { sanitizeForPrompt } from '../src/utils/ai'
-
-// Regression: SEC-002 — SSRF via CORS proxy URL validation
-// Found by /security on 2026-04-05
-// Report: .gstack/qa-reports/qa-report-prospect-os-teal-vercel-app-2026-04-05.md
-
-// Extract the validation function inline since it's not exported
-function isValidPublicUrl(input: string): boolean {
-  try {
-    const u = new URL(input.startsWith('http') ? input : `https://${input}`)
-    if (!['http:', 'https:'].includes(u.protocol)) return false
-    const host = u.hostname.toLowerCase()
-    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') return false
-    if (host.startsWith('10.') || host.startsWith('192.168.') || host.startsWith('172.')) return false
-    if (host === '169.254.169.254') return false
-    if (!host.includes('.')) return false
-    return true
-  } catch {
-    return false
-  }
-}
-
-// Regression: SEC-005 — Phone validation
-function isValidSpanishPhone(phone: string): boolean {
-  const clean = phone.replace(/[\s\-()]/g, '')
-  return /^(\+34)?[67]\d{8}$/.test(clean)
-}
+import { isValidPublicUrl, isValidSpanishPhone } from '../src/utils/validation'
 
 describe('isValidPublicUrl (SEC-002: SSRF prevention)', () => {
   it('accepts valid public URLs', () => {
