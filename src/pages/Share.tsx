@@ -23,14 +23,15 @@ export default function Share() {
       setLoading(false)
       return
     }
+    // SEC: use RPC instead of direct table SELECT to prevent anon enumeration.
+    // get_kit_by_id is SECURITY DEFINER — anon can fetch by ID but cannot list
+    // the full table via /rest/v1/implementation_kits.
     supabase
-      .from('implementation_kits')
-      .select('id, kit_type, content')
-      .eq('id', kitId)
-      .single()
+      .rpc('get_kit_by_id', { kit_id: kitId })
       .then(({ data, error }) => {
-        if (error || !data) setNotFound(true)
-        else setKit(data as KitRow)
+        const row = Array.isArray(data) ? data[0] : null
+        if (error || !row) setNotFound(true)
+        else setKit(row as KitRow)
         setLoading(false)
       })
   }, [kitId])
