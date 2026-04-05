@@ -19,11 +19,37 @@ Analiza el HTML proporcionado y devuelve SOLO un JSON válido (sin markdown, sin
 Sé preciso. Si no puedes determinar algo, usa false. Siempre devuelve JSON válido.`
 
 /**
+ * Extracts the auditable portion of raw HTML for LLM analysis.
+ *
+ * Strategy (ordered by signal value):
+ * 1. Full <head> block — contains analytics, meta pixel, viewport, WP signals
+ * 2. First 2000 chars of <body> — chatbot/WhatsApp widgets injected near top
+ * 3. Fallback to raw slice if HTML is malformed / no recognizable structure
+ *
+ * Blind slicing at a fixed char count risks cutting before </head>, leaving
+ * the most diagnostic signals out of the prompt.
+ */
+export function extractAuditableHTML(rawHtml: string, maxLen = 6000): string {
+  const headMatch = rawHtml.match(/<head[\s\S]*?<\/head>/i)
+  const head = headMatch ? headMatch[0] : ''
+
+  const bodyStart = rawHtml.indexOf('<body')
+  const bodyChunk = bodyStart >= 0
+    ? rawHtml.slice(bodyStart, bodyStart + 2000)
+    : ''
+
+  const combined = head || bodyChunk
+    ? `${head}\n${bodyChunk}`.trim().slice(0, maxLen)
+    : rawHtml.slice(0, maxLen)   // fallback for malformed HTML
+
+  return combined
+}
+
+/**
  * Fetches a website's HTML via a public proxy (to bypass CORS)
- * and returns the text content for AI analysis.
+ * and returns the auditable portion for AI analysis.
  */
 async function fetchWebsiteHTML(url: string): Promise<string> {
-  // Try multiple CORS proxy approaches
   const proxies = [
     `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
     `https://corsproxy.io/?${encodeURIComponent(url)}`,
@@ -33,9 +59,8 @@ async function fetchWebsiteHTML(url: string): Promise<string> {
     try {
       const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) })
       if (res.ok) {
-        const html = await res.text()
-        // Trim to ~6000 chars to stay within token limits
-        return html.slice(0, 6000)
+        const raw = await res.text()
+        return extractAuditableHTML(raw)
       }
     } catch {
       continue
@@ -72,7 +97,7 @@ export async function auditWebsite(
     provider,
     apiKey,
     systemPrompt: WEB_AUDIT_PROMPT,
-    userPrompt: `URL: ${websiteUrl}\n\nHTML (primeros 6000 chars):\n${html}`,
+    userPrompt: `URL: ${websiteUrl}\n\nHTML (head + inicio del body):\n${html}`,
     maxTokens: 1024,
   })
 
