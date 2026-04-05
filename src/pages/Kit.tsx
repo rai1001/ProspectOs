@@ -8,8 +8,10 @@ import { ScoreBadge } from '../components/ScoreBadge'
 import { SectorBadge } from '../components/SectorBadge'
 import { toast } from '../components/Toast'
 import { useLeads, type LeadWithBusiness } from '../hooks/useLeads'
-import { supabase } from '../lib/supabase'
+import { supabase, type ImplementationKit } from '../lib/supabase'
 import type { Json as SupabaseJson } from '../types/database'
+import { useAIProvider } from '../hooks/useAIProvider'
+import { generateText, PROVIDER_LABELS } from '../utils/ai'
 
 type TabKey = 'agent' | 'web'
 type Json = Record<string, unknown>  // local alias for kit content shaping
@@ -103,13 +105,22 @@ function parseKitJSON(text: string): Json | null {
   }
 }
 
+function formatRelativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `hace ${mins}m`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `hace ${hrs}h`
+  return `hace ${Math.floor(hrs / 24)}d`
+}
+
 export default function Kit() {
   const [searchParams] = useSearchParams()
   const { leads } = useLeads()
+  const { provider, apiKey } = useAIProvider()
 
   const [selectedLeadId, setSelectedLeadId] = useState<string>(searchParams.get('lead') ?? '')
   const [activeTab, setActiveTab] = useState<TabKey>('agent')
-  const [groqKey, setGroqKey] = useState(() => localStorage.getItem('prospectOS_groq_key') ?? '')
 
   const [generatingAgent, setGeneratingAgent] = useState(false)
   const [generatingWeb, setGeneratingWeb] = useState(false)
@@ -119,6 +130,7 @@ export default function Kit() {
   const [webKitId, setWebKitId] = useState<string | null>(null)
   const [copiedAgent, setCopiedAgent] = useState(false)
   const [copiedWeb, setCopiedWeb] = useState(false)
+  const [kitHistory, setKitHistory] = useState<ImplementationKit[]>([])
 
   const selectedLead = leads.find(l => l.id === selectedLeadId) ?? null
 
@@ -127,15 +139,27 @@ export default function Kit() {
     if (leadId) setSelectedLeadId(leadId)
   }, [searchParams])
 
+  // Load kit history when lead changes
+  useEffect(() => {
+    if (!selectedLeadId) { setKitHistory([]); return }
+    supabase
+      .from('implementation_kits')
+      .select('*')
+      .eq('lead_id', selectedLeadId)
+      .order('created_at', { ascending: false })
+      .limit(3)
+      .then(({ data }) => setKitHistory(data ?? []))
+  }, [selectedLeadId])
+
   const isGenerating = activeTab === 'agent' ? generatingAgent : generatingWeb
   const currentKit = activeTab === 'agent' ? agentKit : webKit
   const currentKitId = activeTab === 'agent' ? agentKitId : webKitId
   const copied = activeTab === 'agent' ? copiedAgent : copiedWeb
-  const canGenerate = Boolean(selectedLead && groqKey)
+  const canGenerate = Boolean(selectedLead && apiKey)
 
   const handleGenerate = async () => {
-    if (!selectedLead || !groqKey) return
-    localStorage.setItem('prospectOS_groq_key', groqKey)
+    if (!selectedLead || !apiKey) return
+    localStorage.setItem('prospectOS_groq_key', apiKey)
 
     const tab = activeTab
     const setGenerating = tab === 'agent' ? setGeneratingAgent : setGeneratingWeb
@@ -147,42 +171,22 @@ export default function Kit() {
     setKitId(null)
 
     try {
-      // 1. Query RAG templates by sector/category
       const ragContext = await queryRAG(
         selectedLead.business.sector,
         tab === 'agent' ? 'agent_template' : 'web_template',
       )
-
-      // 2. Generate kit via Groq
       const prompt = buildKitPrompt(selectedLead, tab, ragContext)
       const systemPrompt = tab === 'agent' ? AGENT_SYSTEM_PROMPT : WEB_SYSTEM_PROMPT
 
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${groqKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          max_tokens: 4096,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: prompt },
-          ],
-        }),
+      const text = await generateText({
+        provider,
+        apiKey,
+        systemPrompt,
+        userPrompt: prompt,
+        maxTokens: 4096,
       })
 
-      if (!response.ok) {
-        const err = await response.json()
-        if (response.status === 401) throw new Error('API key de Groq inválida')
-        throw new Error(err.error?.message ?? `Error ${response.status}`)
-      }
-
-      const data = await response.json()
-      const text = data.choices[0].message.content
       const parsed = parseKitJSON(text)
-
       if (!parsed) {
         setKit({ _raw: text, _fallback: true } as Json)
         toast('Kit generado (formato texto)', { description: 'El JSON no pudo parsearse' })
@@ -190,7 +194,6 @@ export default function Kit() {
         setKit(parsed)
       }
 
-      // 4. Save to implementation_kits
       const kitContent = (parsed ?? { _raw: text }) as unknown as SupabaseJson
       const { data: saved, error: saveErr } = await supabase
         .from('implementation_kits')
@@ -205,6 +208,14 @@ export default function Kit() {
 
       if (!saveErr && saved) {
         setKitId(saved.id)
+        // Refresh history
+        supabase
+          .from('implementation_kits')
+          .select('*')
+          .eq('lead_id', selectedLead.id)
+          .order('created_at', { ascending: false })
+          .limit(3)
+          .then(({ data }) => setKitHistory(data ?? []))
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al generar el kit'
@@ -274,21 +285,16 @@ export default function Kit() {
       <h1 className="text-lg font-mono font-semibold text-white mb-1">Kit Generator</h1>
       <p className="text-sm text-[#9ca3af] mb-6">Genera kits de implementación con IA para tus leads</p>
 
-      {/* Groq API Key */}
-      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-4 mb-5">
-        <label className="block text-xs text-[#9ca3af] mb-1.5 font-medium">Groq API Key</label>
-        <input
-          type="password"
-          value={groqKey}
-          onChange={e => setGroqKey(e.target.value)}
-          placeholder="gsk_xxxxx"
-          className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-white placeholder-[#4a4a4a] focus:outline-none focus:border-amber-500"
-        />
-        {!groqKey && (
-          <p className="text-xs text-[#9ca3af] mt-1.5 flex items-center gap-1">
-            <AlertCircle size={12} />
-            Necesitas una API key de Groq (gratis en console.groq.com). Se guarda localmente.
-          </p>
+      {/* Groq API Key → replaced by provider indicator */}
+      <div className="flex items-center justify-between bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-4 py-3 mb-5">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[#9ca3af]">Modelo:</span>
+          <span className="text-xs font-mono text-amber-400">{PROVIDER_LABELS[provider]}</span>
+        </div>
+        {!apiKey && (
+          <Link to="/settings" className="text-xs text-red-400 hover:text-red-300">
+            Configura la key en Ajustes
+          </Link>
         )}
       </div>
 
@@ -371,6 +377,40 @@ export default function Kit() {
             <p className="text-xs text-[#9ca3af] flex items-center gap-1">
               <AlertCircle size={12} /> Selecciona un lead para habilitar la generación
             </p>
+          )}
+
+          {/* Kit history */}
+          {selectedLead && kitHistory.length > 0 && (
+            <div className="border-t border-[#2a2a2a] pt-3">
+              <p className="text-[10px] text-[#4a4a4a] uppercase tracking-wider mb-2">Últimos kits</p>
+              <div className="space-y-1.5">
+                {kitHistory.map(kit => (
+                  <div key={kit.id} className="flex items-center gap-2">
+                    <span className={cn(
+                      'text-[10px] px-1.5 py-0.5 rounded font-mono uppercase',
+                      kit.kit_type === 'agent'
+                        ? 'bg-amber-500/15 text-amber-400'
+                        : 'bg-blue-500/15 text-blue-400',
+                    )}>
+                      {kit.kit_type}
+                    </span>
+                    <span className="text-xs text-[#9ca3af] flex-1 truncate">
+                      {kit.created_at ? formatRelativeTime(kit.created_at) : '—'}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setActiveTab(kit.kit_type as TabKey)
+                        if (kit.kit_type === 'agent') setAgentKit(kit.content as unknown as Json)
+                        else setWebKit(kit.content as unknown as Json)
+                      }}
+                      className="text-xs text-[#9ca3af] hover:text-white transition-colors"
+                    >
+                      Cargar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { Loader2, Copy, RefreshCw, Save, MessageCircle, AlertCircle, CheckCircle2, FileText } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { ScoreBadge } from '../components/ScoreBadge'
@@ -7,6 +7,8 @@ import { SectorBadge } from '../components/SectorBadge'
 import { toast } from '../components/Toast'
 import { useLeads, type LeadWithBusiness } from '../hooks/useLeads'
 import { supabase } from '../lib/supabase'
+import { useAIProvider } from '../hooks/useAIProvider'
+import { generateText, PROVIDER_LABELS, PROVIDER_MODELS } from '../utils/ai'
 
 type ServiceType = 'agente_ia' | 'web' | 'pack_completo'
 type Tone = 'formal' | 'cercano' | 'whatsapp'
@@ -60,10 +62,10 @@ export default function Propuestas() {
   const navigate = useNavigate()
   const { leads, updateLead } = useLeads()
 
+  const { provider, apiKey } = useAIProvider()
   const [selectedLeadId, setSelectedLeadId] = useState<string>(searchParams.get('lead') ?? '')
   const [service, setService] = useState<ServiceType>('agente_ia')
   const [tone, setTone] = useState<Tone>('cercano')
-  const [claudeKey, setClaudeKey] = useState(() => localStorage.getItem('prospectOS_groq_key') ?? '')
   const [generating, setGenerating] = useState(false)
   const [content, setContent] = useState('')
   const [saving, setSaving] = useState(false)
@@ -77,54 +79,32 @@ export default function Propuestas() {
     if (leadId) setSelectedLeadId(leadId)
   }, [searchParams])
 
-  const canGenerate = Boolean(selectedLead && claudeKey)
+  const canGenerate = Boolean(selectedLead && apiKey)
 
   const handleGenerate = async () => {
-    if (!selectedLead || !claudeKey) return
-    localStorage.setItem('prospectOS_groq_key', claudeKey)
+    if (!selectedLead || !apiKey) return
     setGenerating(true)
     setContent('')
-
     const prompt = buildPrompt(selectedLead, service, tone)
-
     try {
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${claudeKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          max_tokens: 1024,
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: prompt },
-          ],
-        }),
+      const text = await generateText({
+        provider,
+        apiKey,
+        systemPrompt: SYSTEM_PROMPT,
+        userPrompt: prompt,
+        maxTokens: 1024,
       })
-
-      if (!response.ok) {
-        const err = await response.json()
-        if (response.status === 401) throw new Error('API key de Groq inválida')
-        throw new Error(err.error?.message ?? `Error ${response.status}`)
-      }
-
-      const data = await response.json()
-      const text = data.choices[0].message.content
       setContent(text)
-
-      // Save proposal to DB
       await supabase.from('proposals').insert({
         lead_id: selectedLead.id,
         service_type: service,
         tone,
-        model_used: 'llama-3.3-70b-versatile',
+        model_used: PROVIDER_MODELS[provider],
         prompt_used: prompt,
         content: text,
       })
-    } catch (err: any) {
-      toast.error(err.message ?? 'Error al generar la propuesta')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error al generar la propuesta')
     } finally {
       setGenerating(false)
     }
@@ -175,21 +155,18 @@ export default function Propuestas() {
       <h1 className="text-lg font-mono font-semibold text-white mb-1">Propuestas</h1>
       <p className="text-sm text-[#9ca3af] mb-6">Genera propuestas personalizadas con IA</p>
 
-      {/* API Key */}
-      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-4 mb-5">
-        <label className="block text-xs text-[#9ca3af] mb-1.5 font-medium">Groq API Key</label>
-        <input
-          type="password"
-          value={claudeKey}
-          onChange={e => setClaudeKey(e.target.value)}
-          placeholder="gsk_xxxxx"
-          className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-white placeholder-[#4a4a4a] focus:outline-none focus:border-amber-500"
-        />
-        {!claudeKey && (
-          <p className="text-xs text-[#9ca3af] mt-1.5 flex items-center gap-1">
-            <AlertCircle size={12} />
-            Necesitas una API key de Groq (gratis en console.groq.com). Se guarda localmente.
-          </p>
+      {/* Provider indicator */}
+      <div className="flex items-center justify-between bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-4 py-3 mb-5">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[#9ca3af]">Modelo:</span>
+          <span className="text-xs font-mono text-amber-400">{PROVIDER_LABELS[provider]}</span>
+        </div>
+        {apiKey ? (
+          <span className="text-xs text-green-400 flex items-center gap-1"><CheckCircle2 size={11} /> Configurado</span>
+        ) : (
+          <Link to="/settings" className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
+            <AlertCircle size={11} /> Configura la key en Ajustes
+          </Link>
         )}
       </div>
 
