@@ -15,7 +15,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-
 import { CSS } from '@dnd-kit/utilities'
 import {
   Trash2, FileText, Eye, Download, Loader2, GripVertical,
-  Users, X, Save, Wrench,
+  Users, X, Save, Wrench, ScanSearch,
 } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { ScoreBadge } from '../components/ScoreBadge'
@@ -25,6 +25,8 @@ import { toast } from '../components/Toast'
 import { useLeads, type LeadWithBusiness } from '../hooks/useLeads'
 import { supabase } from '../lib/supabase'
 import { LEAD_STATUSES, STATUS_LABELS, type LeadStatus } from '../constants/statuses'
+import { auditWebsite, type WebAuditResult } from '../utils/audit'
+import { useAIProvider } from '../hooks/useAIProvider'
 
 // ─── Metric cards ───────────────────────────────────────────────
 function MetricCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
@@ -116,6 +118,9 @@ function LeadPanel({ lead, onClose, onUpdate }: {
   const [status, setStatus] = useState<LeadStatus>(lead.status as LeadStatus)
   const [followUp, setFollowUp] = useState(lead.next_follow_up ?? '')
   const [saving, setSaving] = useState(false)
+  const [auditing, setAuditing] = useState(false)
+  const [auditResult, setAuditResult] = useState<WebAuditResult | null>(null)
+  const { provider, apiKey } = useAIProvider()
 
   const handleSave = async () => {
     setSaving(true)
@@ -161,6 +166,64 @@ function LeadPanel({ lead, onClose, onUpdate }: {
             <p className="text-[#9ca3af]">Rating: {b.google_rating} ({b.review_count ?? '?'} reseñas)</p>
           )}
         </div>
+
+        {/* Audit button */}
+        {b.website && (
+          <div>
+            <button
+              onClick={async () => {
+                if (!apiKey) { toast.error('Configura tu API key en Ajustes'); return }
+                setAuditing(true)
+                try {
+                  const result = await auditWebsite(b.website!, provider, apiKey)
+                  setAuditResult(result)
+                  // Save to DB
+                  await supabase.from('businesses').update({
+                    has_chatbot: result.has_chatbot,
+                    technologies: result.technologies as unknown as any,
+                    pain_points: result.issues as unknown as any,
+                    website_outdated: result.quality_score < 5,
+                  }).eq('id', b.id)
+                  toast.success('Auditoría completada')
+                } catch (err: unknown) {
+                  toast.error(err instanceof Error ? err.message : 'Error en la auditoría')
+                } finally {
+                  setAuditing(false)
+                }
+              }}
+              disabled={auditing}
+              className="w-full flex items-center justify-center gap-2 bg-purple-500/15 hover:bg-purple-500/25 text-purple-400 border border-purple-500/25 text-xs font-medium rounded px-3 py-2 transition-colors disabled:opacity-40"
+            >
+              {auditing ? <Loader2 size={12} className="animate-spin" /> : <ScanSearch size={12} />}
+              {auditing ? 'Analizando web...' : 'Auditar con IA'}
+            </button>
+            {auditResult && (
+              <div className="mt-2 bg-[#0f0f0f] border border-[#2a2a2a] rounded p-3 space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-[10px] text-[#9ca3af]">Calidad web</span>
+                  <span className={cn('text-xs font-mono font-bold', auditResult.quality_score >= 7 ? 'text-green-400' : auditResult.quality_score >= 4 ? 'text-amber-400' : 'text-red-400')}>
+                    {auditResult.quality_score}/10
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {!auditResult.has_chatbot && <span className="text-[9px] bg-red-500/15 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded">Sin chatbot</span>}
+                  {!auditResult.has_booking_widget && <span className="text-[9px] bg-red-500/15 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded">Sin reservas</span>}
+                  {auditResult.uses_wordpress && <span className="text-[9px] bg-blue-500/15 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded">WordPress</span>}
+                  {!auditResult.mobile_friendly && <span className="text-[9px] bg-red-500/15 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded">No mobile</span>}
+                  {auditResult.has_meta_pixel && <span className="text-[9px] bg-green-500/15 text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded">Meta Pixel</span>}
+                </div>
+                {auditResult.issues.length > 0 && (
+                  <div className="mt-1">
+                    <p className="text-[10px] text-[#4a4a4a] uppercase tracking-wider mb-1">Problemas</p>
+                    {auditResult.issues.map((issue, i) => (
+                      <p key={i} className="text-[10px] text-red-300">• {issue}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Status */}
         <div>

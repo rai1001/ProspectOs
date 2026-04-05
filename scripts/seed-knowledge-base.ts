@@ -58,7 +58,7 @@ async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-async function groqChat(systemPrompt: string, userPrompt: string, retries = 3): Promise<string> {
+async function groqChat(systemPrompt: string, userPrompt: string, retries = 5): Promise<string> {
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -78,8 +78,9 @@ async function groqChat(systemPrompt: string, userPrompt: string, retries = 3): 
       })
       if (!res.ok) {
         if (res.status === 429) {
-          const wait = Math.pow(2, attempt) * 5000
-          console.log(`  Rate limited, waiting ${wait / 1000}s...`)
+          // Free tier: wait much longer — 30s, 60s, 120s, 240s, 480s
+          const wait = Math.pow(2, attempt) * 30000
+          console.log(`  Rate limited (attempt ${attempt + 1}/${retries}), waiting ${wait / 1000}s...`)
           await sleep(wait)
           continue
         }
@@ -89,7 +90,7 @@ async function groqChat(systemPrompt: string, userPrompt: string, retries = 3): 
       return data.choices[0].message.content
     } catch (err) {
       if (attempt === retries - 1) throw err
-      const wait = Math.pow(2, attempt) * 1000
+      const wait = Math.pow(2, attempt) * 2000
       console.log(`  Retry ${attempt + 1}/${retries} after ${wait}ms...`)
       await sleep(wait)
     }
@@ -164,48 +165,47 @@ async function main() {
   let seeded = 0
   let failed = 0
 
-  // Process in batches of 5 (Groq free tier has aggressive rate limits)
-  const BATCH_SIZE = 5
-  for (let i = 0; i < templates.length; i += BATCH_SIZE) {
-    const batch = templates.slice(i, i + BATCH_SIZE)
+  // Process one at a time with 15s delay — Groq free tier: ~4 RPM sustained
+  const INTER_REQUEST_DELAY = 15000
+  for (let i = 0; i < templates.length; i++) {
+    const tpl = templates[i]
 
-    for (const tpl of batch) {
-      if (continueFlag && existingTitles.has(tpl.title)) {
-        seeded++
-        continue
-      }
-      try {
-        const systemPrompt = tpl.category === 'agent_template' ? AGENT_SYSTEM : WEB_SYSTEM
-        const userPrompt = `Genera un template de "${tpl.title}" para el sector "${tpl.sector}" en España. ${tpl.platform ? `Plataforma: ${tpl.platform}.` : 'Template genérico.'}`
-
-        const raw = await groqChat(systemPrompt, userPrompt)
-        const content = parseJSON(raw) ?? { _raw: raw }
-
-        const { error } = await supabase.from('knowledge_base').insert({
-          category: tpl.category,
-          sector: tpl.sector,
-          platform: tpl.platform,
-          title: tpl.title,
-          content,
-        })
-
-        if (error) {
-          console.error(`  Error inserting "${tpl.title}": ${error.message}`)
-          failed++
-        } else {
-          seeded++
-        }
-      } catch (err) {
-        console.error(`  Failed "${tpl.title}": ${err}`)
-        failed++
-      }
+    if (continueFlag && existingTitles.has(tpl.title)) {
+      seeded++
+      if ((i + 1) % 12 === 0) console.log(`Seeded ${seeded}/${templates.length} (${failed} failed)...`)
+      continue
     }
 
-    console.log(`Seeded ${seeded}/${templates.length} (${failed} failed)...`)
+    try {
+      const systemPrompt = tpl.category === 'agent_template' ? AGENT_SYSTEM : WEB_SYSTEM
+      const userPrompt = `Genera un template de "${tpl.title}" para el sector "${tpl.sector}" en España. ${tpl.platform ? `Plataforma: ${tpl.platform}.` : 'Template genérico.'}`
 
-    // 5s delay between batches to respect Groq free tier rate limits
-    if (i + BATCH_SIZE < templates.length) {
-      await sleep(5000)
+      const raw = await groqChat(systemPrompt, userPrompt)
+      const content = parseJSON(raw) ?? { _raw: raw }
+
+      const { error } = await supabase.from('knowledge_base').insert({
+        category: tpl.category,
+        sector: tpl.sector,
+        platform: tpl.platform,
+        title: tpl.title,
+        content,
+      })
+
+      if (error) {
+        console.error(`  Error inserting "${tpl.title}": ${error.message}`)
+        failed++
+      } else {
+        seeded++
+        console.log(`  OK [${seeded}/${templates.length}] ${tpl.title}`)
+      }
+    } catch (err) {
+      console.error(`  Failed "${tpl.title}": ${err}`)
+      failed++
+    }
+
+    // 15s between each request to stay under ~4 RPM on free tier
+    if (i + 1 < templates.length) {
+      await sleep(INTER_REQUEST_DELAY)
     }
   }
 

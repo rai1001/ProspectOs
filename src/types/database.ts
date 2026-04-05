@@ -19,15 +19,18 @@ export type Database = {
           address: string | null
           created_at: string | null
           google_rating: number | null
+          has_chatbot: boolean | null
           has_google_business: boolean | null
           id: string
           mobile_phone: string | null
           name: string
+          pain_points: Json | null
           phone: string | null
           place_id: string | null
           review_count: number | null
           sector: string
           source: string
+          technologies: Json | null
           website: string | null
           website_outdated: boolean | null
         }
@@ -35,15 +38,18 @@ export type Database = {
           address?: string | null
           created_at?: string | null
           google_rating?: number | null
+          has_chatbot?: boolean | null
           has_google_business?: boolean | null
           id?: string
           mobile_phone?: string | null
           name: string
+          pain_points?: Json | null
           phone?: string | null
           place_id?: string | null
           review_count?: number | null
           sector: string
           source: string
+          technologies?: Json | null
           website?: string | null
           website_outdated?: boolean | null
         }
@@ -51,15 +57,18 @@ export type Database = {
           address?: string | null
           created_at?: string | null
           google_rating?: number | null
+          has_chatbot?: boolean | null
           has_google_business?: boolean | null
           id?: string
           mobile_phone?: string | null
           name?: string
+          pain_points?: Json | null
           phone?: string | null
           place_id?: string | null
           review_count?: number | null
           sector?: string
           source?: string
+          technologies?: Json | null
           website?: string | null
           website_outdated?: boolean | null
         }

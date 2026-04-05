@@ -29,6 +29,18 @@ export function calculateScore(business: Business, rules: ScoringRule[]): number
       case 'website_outdated':
         if (business.website_outdated) score += rule.points
         break
+      case 'no_chatbot':
+        if (business.has_chatbot === false) score += rule.points
+        break
+      case 'has_pain_points':
+        if (Array.isArray(business.pain_points) && business.pain_points.length > 0) score += rule.points
+        break
+      case 'web_slow_or_old':
+        if (business.technologies && Array.isArray(business.technologies)) {
+          const techs = business.technologies as string[]
+          if (techs.includes('outdated_cms') || techs.includes('slow_loading')) score += rule.points
+        }
+        break
     }
   }
 
