@@ -52,12 +52,12 @@ export default function Login() {
               onChange={e => setEmail(e.target.value)}
               placeholder="tu@email.com"
               required
-              className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-white placeholder-[#4a4a4a] focus:outline-none focus:border-amber-500 mb-4"
+              className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-4 py-3 text-sm text-white placeholder-[#4a4a4a] focus:outline-none focus:border-amber-500 mb-4"
             />
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black font-medium text-sm rounded px-4 py-2 transition-colors"
+              className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black font-semibold text-sm rounded-lg px-4 py-3 transition-colors"
             >
               {loading ? 'Enviando...' : 'Enviar enlace'}
             </button>
