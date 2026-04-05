@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import {
   DndContext,
   type DragEndEvent,
@@ -15,7 +15,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-
 import { CSS } from '@dnd-kit/utilities'
 import {
   Trash2, FileText, Eye, Download, Loader2, GripVertical,
-  Users, X, Save,
+  Users, X, Save, Wrench,
 } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { ScoreBadge } from '../components/ScoreBadge'
@@ -23,6 +23,7 @@ import { StatusBadge } from '../components/StatusBadge'
 import { SectorBadge } from '../components/SectorBadge'
 import { toast } from '../components/Toast'
 import { useLeads, type LeadWithBusiness } from '../hooks/useLeads'
+import { supabase } from '../lib/supabase'
 import { LEAD_STATUSES, STATUS_LABELS, type LeadStatus } from '../constants/statuses'
 
 // ─── Metric cards ───────────────────────────────────────────────
@@ -42,11 +43,13 @@ function LeadCard({
   onView,
   onDelete,
   onProposal,
+  hasKit,
 }: {
   lead: LeadWithBusiness
   onView: () => void
   onDelete: () => void
   onProposal: () => void
+  hasKit?: boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lead.id })
 
@@ -69,7 +72,18 @@ function LeadCard({
             <p className="text-sm font-medium text-white truncate">{lead.business.name}</p>
             <ScoreBadge score={lead.score} size="sm" />
           </div>
-          <SectorBadge sector={lead.business.sector} className="mt-1" />
+          <div className="flex items-center gap-1 mt-1">
+            <SectorBadge sector={lead.business.sector} />
+            {hasKit && (
+              <Link
+                to={`/kit?lead=${lead.id}`}
+                className="inline-flex items-center gap-0.5 text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/25 px-1.5 py-0.5 rounded hover:bg-amber-500/25 transition-colors"
+                onClick={e => e.stopPropagation()}
+              >
+                <Wrench size={9} /> Kit
+              </Link>
+            )}
+          </div>
           {lead.business.phone && (
             <p className="text-xs text-[#9ca3af] mt-1 truncate">{lead.business.phone}</p>
           )}
@@ -212,6 +226,14 @@ export default function Pipeline() {
   const navigate = useNavigate()
   const [selectedLead, setSelectedLead] = useState<LeadWithBusiness | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [kitLeadIds, setKitLeadIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(supabase as any).from('implementation_kits').select('lead_id').then(({ data }: { data: { lead_id: string }[] | null }) => {
+      if (data) setKitLeadIds(new Set(data.map(k => k.lead_id)))
+    })
+  }, [leads])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
@@ -340,7 +362,17 @@ export default function Pipeline() {
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-white truncate">{lead.business.name}</p>
-                            <SectorBadge sector={lead.business.sector} className="mt-0.5" />
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <SectorBadge sector={lead.business.sector} />
+                              {kitLeadIds.has(lead.id) && (
+                                <Link
+                                  to={`/kit?lead=${lead.id}`}
+                                  className="inline-flex items-center gap-0.5 text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/25 px-1.5 py-0.5 rounded hover:bg-amber-500/25 transition-colors"
+                                >
+                                  <Wrench size={9} /> Kit
+                                </Link>
+                              )}
+                            </div>
                           </div>
                           <ScoreBadge score={lead.score} size="sm" />
                         </div>
@@ -374,6 +406,7 @@ export default function Pipeline() {
                       key={status}
                       status={status}
                       leads={columnLeads}
+                      kitLeadIds={kitLeadIds}
                       onView={lead => setSelectedLead(lead)}
                       onDelete={async (id) => {
                         await deleteLead(id)
@@ -413,12 +446,14 @@ export default function Pipeline() {
 function KanbanColumn({
   status,
   leads,
+  kitLeadIds,
   onView,
   onDelete,
   onProposal,
 }: {
   status: LeadStatus
   leads: LeadWithBusiness[]
+  kitLeadIds: Set<string>
   onView: (l: LeadWithBusiness) => void
   onDelete: (id: string) => void
   onProposal: (l: LeadWithBusiness) => void
@@ -437,6 +472,7 @@ function KanbanColumn({
             <LeadCard
               key={lead.id}
               lead={lead}
+              hasKit={kitLeadIds.has(lead.id)}
               onView={() => onView(lead)}
               onDelete={() => onDelete(lead.id)}
               onProposal={() => onProposal(lead)}

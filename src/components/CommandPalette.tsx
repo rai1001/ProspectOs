@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Target, Columns3, FileText, Settings } from 'lucide-react'
+import { Search, Target, Columns3, FileText, Settings, Wrench } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { ScoreBadge } from './ScoreBadge'
 import { useLeads } from '../hooks/useLeads'
@@ -28,6 +28,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }) {
     { id: 'nav-radar', label: 'Ir al Radar', sub: 'Buscar nuevos negocios', icon: <Target size={14} />, onSelect: () => { navigate('/radar'); onClose() } },
     { id: 'nav-pipeline', label: 'Ir al Pipeline', sub: 'Gestionar leads activos', icon: <Columns3 size={14} />, onSelect: () => { navigate('/pipeline'); onClose() } },
     { id: 'nav-propuestas', label: 'Ir a Propuestas', sub: 'Generar propuesta comercial', icon: <FileText size={14} />, onSelect: () => { navigate('/propuestas'); onClose() } },
+    { id: 'nav-kit', label: 'Ir a Kit Generator', sub: 'Generar kit IA para un lead', icon: <Wrench size={14} />, onSelect: () => { navigate('/kit'); onClose() } },
     { id: 'nav-settings', label: 'Ir a Settings', sub: 'Configurar reglas de scoring', icon: <Settings size={14} />, onSelect: () => { navigate('/settings'); onClose() } },
   ]
 

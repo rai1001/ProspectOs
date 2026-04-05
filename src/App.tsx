@@ -9,6 +9,8 @@ import Radar from './pages/Radar'
 import Pipeline from './pages/Pipeline'
 import Propuestas from './pages/Propuestas'
 import Settings from './pages/Settings'
+import Kit from './pages/Kit'
+import Share from './pages/Share'
 import { Loader2 } from 'lucide-react'
 
 class ConfigErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -68,6 +70,7 @@ function AppShell() {
           <Route path="/radar" element={<Radar />} />
           <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/propuestas" element={<Propuestas />} />
+          <Route path="/kit" element={<Kit />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </main>
@@ -79,19 +82,22 @@ function AppShell() {
 export default function App() {
   return (
     <ConfigErrorBoundary>
-    <BrowserRouter>
-      <AppShell />
-      <Toaster
-        position="bottom-right"
-        toastOptions={{
-          style: {
-            background: '#1a1a1a',
-            border: '1px solid #2a2a2a',
-            color: '#f5f5f5',
-          },
-        }}
-      />
-    </BrowserRouter>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/share/:kitId" element={<Share />} />
+          <Route path="*" element={<AppShell />} />
+        </Routes>
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: '#1a1a1a',
+              border: '1px solid #2a2a2a',
+              color: '#f5f5f5',
+            },
+          }}
+        />
+      </BrowserRouter>
     </ConfigErrorBoundary>
   )
 }

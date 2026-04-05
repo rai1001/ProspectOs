@@ -11,6 +11,7 @@ export default function Settings() {
   const [recalculating, setRecalculating] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editPoints, setEditPoints] = useState<number>(0)
+  const [agencyPhone, setAgencyPhone] = useState(() => localStorage.getItem('prospectOS_agency_phone') ?? '')
 
   const handleRecalculate = async () => {
     setRecalculating(true)
@@ -103,9 +104,27 @@ export default function Settings() {
         )}
       </div>
 
-      <p className="text-xs text-[#9ca3af]">
+      <p className="text-xs text-[#9ca3af] mb-8">
         Los cambios en las reglas no afectan scores existentes hasta que pulses "Recalcular todos".
       </p>
+
+      {/* Agency Phone */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-4">
+        <h2 className="text-sm font-mono font-semibold text-white mb-1">Teléfono de agencia</h2>
+        <p className="text-xs text-[#9ca3af] mb-3">
+          Número de WhatsApp para el botón CTA en los kits compartidos (/share). Formato internacional (ej: 34612345678).
+        </p>
+        <input
+          type="tel"
+          value={agencyPhone}
+          onChange={e => {
+            setAgencyPhone(e.target.value)
+            localStorage.setItem('prospectOS_agency_phone', e.target.value)
+          }}
+          placeholder="34612345678"
+          className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-white placeholder-[#4a4a4a] focus:outline-none focus:border-amber-500"
+        />
+      </div>
     </div>
   )
 }
