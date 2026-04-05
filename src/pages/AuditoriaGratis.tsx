@@ -129,6 +129,7 @@ export default function AuditoriaGratis() {
 
     if (leadError) {
       console.error('Lead insert failed:', leadError.message)
+      // Business was created but lead failed — still show success since we have the contact
     }
 
     setSubmitted(true)

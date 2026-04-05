@@ -177,7 +177,7 @@ export default function Kit() {
 
   const handleGenerate = async () => {
     if (!selectedLead || !apiKey) return
-    localStorage.setItem('prospectOS_groq_key', apiKey)
+    // API key already persisted by useAIProvider hook — don't overwrite wrong key
 
     const tab = activeTab
     const setGenerating = tab === 'agent' ? setGeneratingAgent : setGeneratingWeb
