@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Search, Plus, Globe, Phone, Star, AlertCircle, Loader2, Flame } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { ScoreBadge } from '../components/ScoreBadge'
@@ -33,6 +34,7 @@ export default function Radar() {
   const { rules } = useScoringRules()
   const { leads, addBusinessAndLead } = useLeads()
   const { provider, apiKey } = useAIProvider()
+  const navigate = useNavigate()
 
   const [dolorQuery, setDolorQuery] = useState('')
   const [searchingDolor, setSearchingDolor] = useState(false)
@@ -410,19 +412,40 @@ Busca quejas sobre: atención al cliente mala, no cogen el teléfono, tardan en 
                     {result.alreadyAdded ? (
                       <span className="inline-block text-xs text-amber-400 font-medium">Ya en pipeline</span>
                     ) : (
-                      <button
-                        onClick={() => handleAddResult(result)}
-                        disabled={addingId === key}
-                        className={cn(
-                          'w-full flex items-center justify-center gap-1.5 text-xs font-medium rounded px-3 py-1.5 transition-colors disabled:opacity-40',
-                          isPain
-                            ? 'bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30'
-                            : 'bg-[#2a2a2a] hover:bg-[#333] text-white',
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => handleAddResult(result)}
+                          disabled={addingId === key}
+                          className={cn(
+                            'flex-1 flex items-center justify-center gap-1.5 text-xs font-medium rounded px-3 py-1.5 transition-colors disabled:opacity-40',
+                            isPain
+                              ? 'bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30'
+                              : 'bg-[#2a2a2a] hover:bg-[#333] text-white',
+                          )}
+                        >
+                          {addingId === key ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                          Añadir
+                        </button>
+                        {isPain && (
+                          <button
+                            disabled={addingId === key}
+                            onClick={async () => {
+                              const lead = await addBusinessAndLead(result.data as BusinessInsert)
+                              if (lead) {
+                                setDolorResults(prev => prev.map(r =>
+                                  (r.data.place_id ?? r.data.name) === key ? { ...r, alreadyAdded: true } : r
+                                ))
+                                navigate(`/kit?lead=${lead.id}&auto=agent`)
+                              } else {
+                                toast.error('Error al añadir al pipeline')
+                              }
+                            }}
+                            className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium rounded px-3 py-1.5 transition-colors disabled:opacity-40 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30"
+                          >
+                            <Flame size={12} /> + Kit
+                          </button>
                         )}
-                      >
-                        {addingId === key ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                        {isPain ? 'Añadir Lead de Fuego' : 'Añadir al pipeline'}
-                      </button>
+                      </div>
                     )}
                   </div>
                 )

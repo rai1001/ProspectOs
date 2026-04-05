@@ -115,7 +115,7 @@ function formatRelativeTime(dateStr: string): string {
 }
 
 export default function Kit() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { leads } = useLeads()
   const { provider, apiKey } = useAIProvider()
 
@@ -156,6 +156,24 @@ export default function Kit() {
   const currentKitId = activeTab === 'agent' ? agentKitId : webKitId
   const copied = activeTab === 'agent' ? copiedAgent : copiedWeb
   const canGenerate = Boolean(selectedLead && apiKey)
+  const [autoTriggered, setAutoTriggered] = useState(false)
+
+  // Auto-generate when arriving from Radar with ?auto=agent
+  useEffect(() => {
+    const autoTab = searchParams.get('auto') as TabKey | null
+    if (autoTab && selectedLead && apiKey && !autoTriggered) {
+      setAutoTriggered(true)
+      setActiveTab(autoTab)
+      // Remove auto param from URL
+      const next = new URLSearchParams(searchParams)
+      next.delete('auto')
+      setSearchParams(next, { replace: true })
+      // Trigger generation on next tick (after state settles)
+      setTimeout(() => {
+        document.getElementById('kit-generate-btn')?.click()
+      }, 100)
+    }
+  }, [selectedLead, apiKey, searchParams, autoTriggered, setSearchParams])
 
   const handleGenerate = async () => {
     if (!selectedLead || !apiKey) return
@@ -363,6 +381,7 @@ export default function Kit() {
           )}
 
           <button
+            id="kit-generate-btn"
             onClick={handleGenerate}
             disabled={!canGenerate || isGenerating}
             className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-black font-medium text-sm rounded-lg px-4 py-2.5 transition-colors"
