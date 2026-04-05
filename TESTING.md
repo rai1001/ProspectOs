@@ -20,10 +20,22 @@ npx vitest run --coverage  # with coverage
 
 | Layer | What | Where | When |
 |-------|------|-------|------|
-| Unit | Pure functions (scoring, apify transforms, sector inference) | `test/*.test.ts` | Every change |
+| Unit | Pure functions (scoring, apify transforms, validation, parsing) | `test/*.test.ts` | Every change |
 | Component | React components (ScoreBadge, StatusBadge, forms) | `test/*.test.tsx` | UI changes |
 | Integration | Hooks + Supabase mocks | `test/*.test.tsx` | Data flow changes |
 | E2E | Full app via gstack browse | `.gstack/qa-reports/` | Pre-release |
+
+## Test files
+
+| File | What it covers | Tests |
+|------|---------------|-------|
+| `test/scoring.test.ts` | `calculateScore`, `scoreColor`, `scoreBorderLeft` | 14 |
+| `test/apify.test.ts` | `transformApifyResult` — field mapping, sector inference | 5 |
+| `test/security.test.ts` | `isValidPublicUrl` (SSRF), `isValidSpanishPhone`, `sanitizeForPrompt` | 19 |
+| `test/share-cta.test.ts` | Share CTA: `agency_phone` from DB vs localStorage | 9 |
+| `test/audit.test.ts` | `extractAuditableHTML` — head/body extraction, maxLen | 8 |
+| `test/kit-parsing.test.ts` | `extractFirstJsonObject` — bracket counter vs greedy regex | 12 |
+| **Total** | | **67** |
 
 ## Conventions
 

@@ -20,14 +20,9 @@
 **Context:** Si el import falla, el feedback va al seed template de esa categoría. Ajustar el system prompt de generación para que los node types sean más genéricos.
 **Depends on:** Kit Generator v1 shipped. Primer kit generado.
 
-### P3: Soporte multimodelo (Claude + OpenAI como alternativa a Groq)
-**What:** Añadir soporte para Claude (Anthropic) y OpenAI como proveedores de generación en /kit, además de Groq.
-**Why:** Israel tiene subscripciones a los tres. Claude tiene mejor razonamiento para generación de JSON estructurado. OpenAI es el provider más testeado para JSON mode.
-**Pros:** Flexibilidad, mejor calidad en kits complejos, fallback si Groq tiene issues.
-**Cons:** Tres keys distintas, lógica de selección de provider, posible inconsistencia entre outputs.
-**Effort:** M (human: ~1d / CC: ~30min)
-**Context:** Para v1, Groq es suficiente. Retomar cuando el volumen de kits generados revele limitaciones de calidad.
-**Depends on:** Kit Generator v1 con métricas de uso real.
+### ~~P3: Soporte multimodelo (Claude + OpenAI como alternativa a Groq)~~
+**Completed:** v1.2 (2026-04-05)
+Groq, Gemini, Claude y OpenAI disponibles en Settings. Capa `utils/ai.ts` agnóstica de proveedor. `useAIProvider` hook con validación de provider.
 
 ## ProspectOS — Pending
 

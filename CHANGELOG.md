@@ -1,5 +1,29 @@
 # Changelog — ProspectOS
 
+## [v1.3] — 2026-04-05 (Security Hardening & Reliability)
+
+Siete fixes de seguridad y rendimiento detectados en el adversarial review. Ningún cambio visible en la UI — todo pasa debajo del capó.
+
+### Seguridad
+- **Share CTA funciona en el móvil del cliente**: el teléfono de la agencia ya no se lee del localStorage del visitante (que siempre estaba vacío). Ahora se guarda dentro del kit al generarlo y se recupera de la DB.
+- **Kits ya no son enumerables por anon**: se eliminó la policy `USING (true)` en `implementation_kits`. El acceso anon pasa por un RPC `get_kit_by_id` (SECURITY DEFINER) que solo devuelve un kit por UUID — imposible listar todos los kits con la anon key.
+- **Defensa contra prompt injection**: los campos del negocio (nombre, notas, dirección...) se sanean con `sanitizeForPrompt()` antes de entrar al prompt LLM. Los datos van envueltos en delimitadores XML para que el modelo los trate como datos, no como instrucciones.
+
+### Rendimiento
+- **Recalcular scores ya no congela la app**: era un loop `for await` que enviaba un UPDATE por lead. Ahora es un único `upsert` en batch. Con 50 leads: de ~5 segundos a ~100ms.
+- **La auditoría web ya no falla en sites con cabeceras grandes**: en vez de cortar el HTML en el carácter 6000, se extrae el `<head>` completo más los primeros 2000 chars del `<body>`. Los analytics, el pixel de Meta y el viewport ya no quedan fuera del análisis.
+
+### Fiabilidad
+- **El botón "Generar kit" automático ya no falla**: se eliminó el hack `document.getElementById?.click()` con un `setTimeout(100)`. Ahora el tab se pasa directamente a `handleGenerate()` — sin race conditions ni dependencias del DOM.
+- **El parser de kits ya no confunde JSON con texto posterior**: el regex greedy `/\{[\s\S]*\}/` se reemplazó por un bracket-counter que para en el primer `}` balanceado. Un LLM que añade una nota después del JSON ya no rompe el parse.
+
+### Para contribuidores
+- Nueva utilidad `src/utils/validation.ts` con `isValidPublicUrl` e `isValidSpanishPhone` exportadas (antes inline en el componente).
+- `extractFirstJsonObject` exportada desde `Kit.tsx` para testabilidad.
+- `audit.ts` usa `parseLLMJson<T>()` de `ai.ts` en vez de reimplementarlo.
+- `recalculateScores()` devuelve `{ error }` — `Settings.tsx` lo muestra al usuario.
+- 67 tests en 6 archivos (antes: 30 tests en 3 archivos).
+
 ## [v1.2] — 2026-04-05 (Lead Intelligence & Inbound)
 
 Implementación completa de captura inteligente de leads y "Radar de Dolor" multi-fuente.
