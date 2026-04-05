@@ -86,14 +86,14 @@ export function useLeads() {
   }
 
   const recalculateScores = async () => {
-    if (!rules.length) return
+    if (!rules.length || !leads.length) return
     const updates = leads.map(l => ({
       id: l.id,
       score: calculateScore(l.business, rules),
     }))
-    for (const u of updates) {
-      await supabase.from('leads').update({ score: u.score }).eq('id', u.id)
-    }
+    // Batch upsert: single SQL statement instead of N sequential round-trips.
+    // Supabase translates this to INSERT ... ON CONFLICT (id) DO UPDATE SET score = EXCLUDED.score
+    await supabase.from('leads').upsert(updates, { onConflict: 'id' })
     await fetchLeads()
   }
 
