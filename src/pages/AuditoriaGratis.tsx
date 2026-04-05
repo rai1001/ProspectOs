@@ -179,7 +179,7 @@ export default function AuditoriaGratis() {
             <button
               type="submit"
               disabled={auditing || !url.trim()}
-              className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-black font-semibold text-sm rounded-lg px-4 py-3 transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black font-semibold text-sm rounded-lg px-4 py-3 transition-colors"
             >
               {auditing ? (
                 <><Loader2 size={16} className="animate-spin" /> Analizando...</>
@@ -271,7 +271,7 @@ export default function AuditoriaGratis() {
             <button
               onClick={handleSubmitLead}
               disabled={submitting || !phone.trim()}
-              className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-black font-semibold text-sm rounded-lg px-4 py-3 transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black font-semibold text-sm rounded-lg px-4 py-3 transition-colors"
             >
               {submitting ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
               Quiero la solución
