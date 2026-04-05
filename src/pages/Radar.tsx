@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, Globe, Phone, Star, AlertCircle, Loader2, Flame } from 'lucide-react'
+import { Search, Plus, Globe, Phone, Star, AlertCircle, Loader2, Flame, AtSign, Users, ExternalLink, LinkIcon } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { ScoreBadge } from '../components/ScoreBadge'
 import { SectorBadge } from '../components/SectorBadge'
 import { toast } from '../components/Toast'
-import { searchWithApify, searchWithApifyDeep, type ApifySearchResult, type ApifyReview } from '../utils/apify'
+import { searchWithApify, searchWithApifyDeep, searchInstagramHashtag, type ApifySearchResult, type ApifyReview, type InstagramProfile } from '../utils/apify'
 import { generateText } from '../utils/ai'
 import { useAIProvider } from '../hooks/useAIProvider'
 import { calculateScore } from '../utils/scoring'
@@ -15,7 +15,7 @@ import type { BusinessInsert } from '../lib/supabase'
 import type { Sector } from '../constants/sectors'
 import { SECTORS } from '../constants/sectors'
 
-type Tab = 'apify' | 'dolor' | 'manual'
+type Tab = 'apify' | 'dolor' | 'instagram' | 'manual'
 
 interface SearchResult {
   data: ApifySearchResult
@@ -40,6 +40,12 @@ export default function Radar() {
   const [searchingDolor, setSearchingDolor] = useState(false)
   const [dolorProgress, setDolorProgress] = useState('')
   const [dolorResults, setDolorResults] = useState<SearchResult[]>([])
+
+  // Instagram state
+  const [igQuery, setIgQuery] = useState('')
+  const [searchingIg, setSearchingIg] = useState(false)
+  const [igResults, setIgResults] = useState<InstagramProfile[]>([])
+  const [addingIgUser, setAddingIgUser] = useState<string | null>(null)
 
   const existingPlaceIds = new Set(leads.map(l => l.business.place_id).filter(Boolean))
 
@@ -188,19 +194,20 @@ Busca quejas sobre: atención al cliente mala, no cogen el teléfono, tardan en 
 
       {/* Tabs */}
       <div className="flex gap-1 bg-[#1a1a1a] rounded-lg p-1 w-fit mb-6 border border-[#2a2a2a]">
-        {(['apify', 'dolor', 'manual'] as Tab[]).map(t => (
+        {(['apify', 'dolor', 'instagram', 'manual'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={cn(
               'px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5',
               tab === t
-                ? 'bg-amber-500 text-black'
+                ? t === 'instagram' ? 'bg-pink-500 text-white' : 'bg-amber-500 text-black'
                 : 'text-[#9ca3af] hover:text-white',
             )}
           >
             {t === 'dolor' && <Flame size={13} />}
-            {t === 'apify' ? 'Búsqueda Apify' : t === 'dolor' ? 'Búsqueda Dolor' : 'Entrada manual'}
+            {t === 'instagram' && <AtSign size={13} />}
+            {t === 'apify' ? 'Búsqueda Apify' : t === 'dolor' ? 'Búsqueda Dolor' : t === 'instagram' ? 'Instagram' : 'Entrada manual'}
           </button>
         ))}
       </div>
@@ -458,6 +465,168 @@ Busca quejas sobre: atención al cliente mala, no cogen el teléfono, tardan en 
               <Flame size={32} className="mx-auto mb-3 opacity-20" />
               <p className="text-sm font-medium text-white mb-1">Detecta negocios que necesitan ayuda urgente</p>
               <p className="text-xs">Busca por sector y la IA analizará las reseñas para encontrar quejas de atención</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Instagram tab ──────────────────────────────────────────── */}
+      {tab === 'instagram' && (
+        <div>
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-4 mb-4">
+            <p className="text-xs text-pink-400 mb-2 flex items-center gap-1.5">
+              <AtSign size={12} /> Busca negocios locales por hashtag de Instagram.
+            </p>
+            <p className="text-[10px] text-[#9ca3af] mb-3">
+              Los perfiles sin web o con Linktree aparecerán primero (mejores oportunidades).
+            </p>
+            <label className="block text-xs text-[#9ca3af] mb-1.5 font-medium">Apify API Token</label>
+            <input
+              type="password"
+              value={apifyToken}
+              onChange={e => setApifyToken(e.target.value)}
+              placeholder="apify_api_xxxxx"
+              className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-white placeholder-[#4a4a4a] focus:outline-none focus:border-amber-500 mb-3"
+            />
+          </div>
+
+          <div className="flex gap-2 mb-6">
+            <input
+              type="text"
+              value={igQuery}
+              onChange={e => setIgQuery(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && !searchingIg && igQuery.trim() && (() => {
+                if (!apifyToken) { toast.error('Introduce tu Apify token'); return }
+                localStorage.setItem('prospectOS_apify_token', apifyToken)
+                setSearchingIg(true)
+                setIgResults([])
+                searchInstagramHashtag(igQuery.trim(), apifyToken)
+                  .then(setIgResults)
+                  .catch((err: unknown) => toast.error(err instanceof Error ? err.message : 'Error'))
+                  .finally(() => setSearchingIg(false))
+              })()}
+              placeholder="peluqueriasevilla, clinicaesteticamadrid..."
+              className="flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white placeholder-[#4a4a4a] focus:outline-none focus:border-pink-500"
+            />
+            <button
+              onClick={() => {
+                if (!apifyToken) { toast.error('Introduce tu Apify token'); return }
+                if (!igQuery.trim()) return
+                localStorage.setItem('prospectOS_apify_token', apifyToken)
+                setSearchingIg(true)
+                setIgResults([])
+                searchInstagramHashtag(igQuery.trim(), apifyToken)
+                  .then(setIgResults)
+                  .catch((err: unknown) => toast.error(err instanceof Error ? err.message : 'Error'))
+                  .finally(() => setSearchingIg(false))
+              }}
+              disabled={searchingIg || !igQuery.trim()}
+              className="flex items-center gap-2 bg-pink-500 hover:bg-pink-600 disabled:opacity-40 text-white font-medium text-sm rounded-lg px-4 py-2.5 transition-colors"
+            >
+              {searchingIg ? <Loader2 size={16} className="animate-spin" /> : <AtSign size={16} />}
+              Buscar
+            </button>
+          </div>
+
+          {searchingIg && (
+            <div className="flex items-center gap-2 mb-4 text-sm text-pink-400">
+              <Loader2 size={14} className="animate-spin" /> Buscando perfiles en #{igQuery}...
+            </div>
+          )}
+
+          {igResults.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {igResults.map(profile => (
+                <div
+                  key={profile.username}
+                  className={cn(
+                    'bg-[#1a1a1a] border rounded-lg p-4 border-l-4',
+                    profile.websiteQuality === 'no_website' ? 'border-l-red-400 border-red-500/40'
+                      : profile.websiteQuality === 'linktree' ? 'border-l-orange-400 border-orange-500/40'
+                      : 'border-l-green-400 border-[#2a2a2a]',
+                  )}
+                >
+                  <div className="flex items-start gap-3 mb-2">
+                    {profile.profilePicUrl ? (
+                      <img src={profile.profilePicUrl} alt={profile.username} className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-[#2a2a2a] flex items-center justify-center flex-shrink-0">
+                        <AtSign size={16} className="text-[#4a4a4a]" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-white truncate">@{profile.username}</p>
+                      <p className="text-xs text-[#9ca3af] truncate">{profile.fullName}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] bg-purple-500/10 text-purple-300 border-purple-500/20">
+                      <Users size={9} /> {profile.followersCount.toLocaleString()}
+                    </span>
+                    {profile.isBusinessAccount && (
+                      <span className="text-[10px] bg-blue-500/15 text-blue-300 border border-blue-500/20 px-1.5 py-0.5 rounded">Business</span>
+                    )}
+                    {profile.websiteQuality === 'no_website' && (
+                      <span className="text-[10px] bg-red-500/15 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded">Sin web</span>
+                    )}
+                    {profile.websiteQuality === 'linktree' && (
+                      <span className="text-[10px] bg-orange-500/15 text-orange-400 border border-orange-500/20 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                        <LinkIcon size={8} /> Linktree
+                      </span>
+                    )}
+                    {profile.websiteQuality === 'real_website' && (
+                      <span className="text-[10px] bg-green-500/15 text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                        <Globe size={8} /> Web
+                      </span>
+                    )}
+                  </div>
+
+                  {profile.biography && (
+                    <p className="text-[10px] text-[#9ca3af] line-clamp-2 mb-2">{profile.biography}</p>
+                  )}
+
+                  {profile.externalUrl && (
+                    <a href={profile.externalUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline truncate block mb-2 flex items-center gap-1">
+                      <ExternalLink size={9} /> {profile.externalUrl}
+                    </a>
+                  )}
+
+                  <button
+                    disabled={addingIgUser === profile.username}
+                    onClick={async () => {
+                      setAddingIgUser(profile.username)
+                      const biz: BusinessInsert = {
+                        name: profile.fullName || profile.username,
+                        sector: 'Otro',
+                        source: 'instagram',
+                        website: profile.externalUrl,
+                        has_google_business: false,
+                        website_outdated: profile.websiteQuality !== 'real_website',
+                      }
+                      const lead = await addBusinessAndLead(biz)
+                      if (lead) {
+                        toast.success(`@${profile.username} añadido al pipeline`)
+                      } else {
+                        toast.error('Error al añadir')
+                      }
+                      setAddingIgUser(null)
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 bg-[#2a2a2a] hover:bg-[#333] text-white text-xs font-medium rounded px-3 py-1.5 transition-colors disabled:opacity-40"
+                  >
+                    {addingIgUser === profile.username ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                    Añadir al pipeline
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!searchingIg && igResults.length === 0 && !igQuery && (
+            <div className="text-center py-16 text-[#9ca3af]">
+              <AtSign size={32} className="mx-auto mb-3 opacity-20" />
+              <p className="text-sm font-medium text-white mb-1">Busca negocios por hashtag local</p>
+              <p className="text-xs">Ej: peluqueriasevilla, reformasmadrid, clinicaesteticabcn</p>
             </div>
           )}
         </div>

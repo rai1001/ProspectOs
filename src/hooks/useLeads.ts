@@ -40,9 +40,11 @@ export function useLeads() {
     }
 
     if (!bizData) {
+      // Strip fields not in the DB schema (e.g. reviews from Apify)
+      const { reviews, ...cleanBiz } = business as BusinessInsert & { reviews?: unknown }
       const { data, error } = await supabase
         .from('businesses')
-        .insert(business)
+        .insert(cleanBiz)
         .select()
         .single()
       if (error || !data) return null

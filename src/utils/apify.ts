@@ -168,3 +168,127 @@ export async function searchWithApifyDeep(
     .filter(d => !d.totalScore || d.totalScore < 4.5)
     .map(transformApifyResult)
 }
+
+// ── Instagram Hashtag Scraper ─────────────────────────────────────
+
+export interface InstagramProfile {
+  username: string
+  fullName: string
+  biography: string
+  followersCount: number
+  followingCount: number
+  postsCount: number
+  profilePicUrl: string
+  externalUrl: string | null
+  isBusinessAccount: boolean
+  /** 'linktree' | 'no_website' | 'real_website' */
+  websiteQuality: 'linktree' | 'no_website' | 'real_website'
+}
+
+interface ApifyIGPost {
+  ownerUsername?: string
+  ownerFullName?: string
+  caption?: string
+  // The profile fields come from expanded profile data
+  profilePicUrl?: string
+  // Some actors return owner info inline
+  ownerId?: string
+}
+
+interface ApifyIGProfile {
+  username?: string
+  fullName?: string
+  biography?: string
+  followersCount?: number
+  followingCount?: number
+  postsCount?: number
+  profilePicUrl?: string
+  externalUrl?: string
+  isBusinessAccount?: boolean
+}
+
+function classifyWebsite(url: string | null | undefined): InstagramProfile['websiteQuality'] {
+  if (!url) return 'no_website'
+  const lower = url.toLowerCase()
+  if (lower.includes('linktr.ee') || lower.includes('linktree') || lower.includes('beacons.ai') || lower.includes('bio.link') || lower.includes('campsite.bio')) {
+    return 'linktree'
+  }
+  return 'real_website'
+}
+
+/**
+ * Search Instagram by hashtag to find local business profiles.
+ * Uses the apify/instagram-hashtag-scraper actor.
+ * Returns unique profiles found in posts under the given hashtag.
+ */
+export async function searchInstagramHashtag(
+  hashtag: string,
+  apifyToken: string,
+): Promise<InstagramProfile[]> {
+  const actorId = 'apify~instagram-hashtag-scraper'
+  const runUrl = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=${apifyToken}`
+
+  const cleanTag = hashtag.replace(/^#/, '').trim().toLowerCase()
+
+  const body = {
+    hashtags: [cleanTag],
+    resultsLimit: 30,
+    resultsType: 'posts',
+  }
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 120_000)
+
+  let response: Response
+  try {
+    response = await fetch(runUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'AbortError')
+      throw new Error('La búsqueda de Instagram tardó demasiado (>120s).')
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Apify IG error ${response.status}: ${text}`)
+  }
+
+  const posts: (ApifyIGPost & ApifyIGProfile)[] = await response.json()
+
+  // Deduplicate by username and build profiles
+  const profileMap = new Map<string, InstagramProfile>()
+
+  for (const post of posts) {
+    const username = post.ownerUsername ?? post.username
+    if (!username || profileMap.has(username)) continue
+
+    const externalUrl = post.externalUrl ?? null
+    profileMap.set(username, {
+      username,
+      fullName: post.ownerFullName ?? post.fullName ?? username,
+      biography: post.biography ?? '',
+      followersCount: post.followersCount ?? 0,
+      followingCount: post.followingCount ?? 0,
+      postsCount: post.postsCount ?? 0,
+      profilePicUrl: post.profilePicUrl ?? '',
+      externalUrl,
+      isBusinessAccount: post.isBusinessAccount ?? false,
+      websiteQuality: classifyWebsite(externalUrl),
+    })
+  }
+
+  // Sort: linktree/no_website first (best opportunities), then by followers desc
+  return Array.from(profileMap.values()).sort((a, b) => {
+    const qualityOrder = { no_website: 0, linktree: 1, real_website: 2 }
+    const qDiff = qualityOrder[a.websiteQuality] - qualityOrder[b.websiteQuality]
+    if (qDiff !== 0) return qDiff
+    return b.followersCount - a.followersCount
+  })
+}
