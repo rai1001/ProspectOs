@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { Loader2, Copy, RefreshCw, Save, MessageCircle, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import { Loader2, Copy, RefreshCw, Save, MessageCircle, AlertCircle, CheckCircle2, FileText } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { ScoreBadge } from '../components/ScoreBadge'
 import { SectorBadge } from '../components/SectorBadge'
@@ -57,6 +57,7 @@ ${toneInstruction}`
 
 export default function Propuestas() {
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const { leads, updateLead } = useLeads()
 
   const [selectedLeadId, setSelectedLeadId] = useState<string>(searchParams.get('lead') ?? '')
@@ -153,8 +154,24 @@ export default function Propuestas() {
     ? `https://wa.me/${selectedLead.business.mobile_phone.replace(/\D/g, '')}?text=${encodeURIComponent(content || 'Hola, me gustaría presentarte nuestros servicios...')}`
     : null
 
+  if (leads.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+        <FileText size={40} className="text-[#3a3a3a] mb-3" />
+        <p className="text-sm font-medium text-white mb-1">Sin leads en el pipeline</p>
+        <p className="text-xs text-[#9ca3af] mb-4">Añade negocios desde el Radar para poder generar propuestas</p>
+        <button
+          onClick={() => navigate('/radar')}
+          className="bg-amber-500 hover:bg-amber-600 text-black text-sm font-medium rounded-lg px-4 py-2"
+        >
+          Ir al Radar
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex-1 p-6 max-w-4xl">
+    <div className="flex-1 p-4 md:p-6 max-w-4xl">
       <h1 className="text-lg font-mono font-semibold text-white mb-1">Propuestas</h1>
       <p className="text-sm text-[#9ca3af] mb-6">Genera propuestas personalizadas con IA</p>
 

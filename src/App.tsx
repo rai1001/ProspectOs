@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Component, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
 import { CommandPalette } from './components/CommandPalette'
@@ -10,6 +10,29 @@ import Pipeline from './pages/Pipeline'
 import Propuestas from './pages/Propuestas'
 import Settings from './pages/Settings'
 import { Loader2 } from 'lucide-react'
+
+class ConfigErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null }
+  static getDerivedStateFromError(error: Error) { return { error } }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#0f0f0f] p-8">
+          <div className="max-w-md text-center space-y-4">
+            <p className="text-red-400 font-mono text-sm">Error de configuración</p>
+            <p className="text-[#9ca3af] text-sm">
+              Revisa tu <code className="text-amber-400">.env.local</code>: asegúrate de que{' '}
+              <code className="text-amber-400">VITE_SUPABASE_URL</code> y{' '}
+              <code className="text-amber-400">VITE_SUPABASE_ANON_KEY</code> tienen valores reales.
+            </p>
+            <p className="text-[#4a4a4a] text-xs font-mono">{(this.state.error as Error).message}</p>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 function AppShell() {
   const { session, loading } = useAuth()
@@ -55,6 +78,7 @@ function AppShell() {
 
 export default function App() {
   return (
+    <ConfigErrorBoundary>
     <BrowserRouter>
       <AppShell />
       <Toaster
@@ -68,5 +92,6 @@ export default function App() {
         }}
       />
     </BrowserRouter>
+    </ConfigErrorBoundary>
   )
 }

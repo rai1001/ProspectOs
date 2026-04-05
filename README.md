@@ -1,73 +1,137 @@
-# React + TypeScript + Vite
+# ProspectOS
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Herramienta de prospección de negocios locales en A Coruña. Busca negocios via Google Maps (Apify), los evalúa con scoring personalizado, gestiona el pipeline de ventas en kanban, y genera propuestas comerciales con IA (Groq/llama-3.3).
 
-Currently, two official plugins are available:
+**Live:** https://prospect-os-teal.vercel.app/
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Stack
 
-## React Compiler
+| Capa | Tecnología |
+|------|-----------|
+| Frontend | React 19 + Vite + Tailwind CSS |
+| Backend | Supabase (PostgreSQL + Auth magic link) |
+| Búsqueda | Apify Google Maps Scraper |
+| IA propuestas | Groq (llama-3.3-70b-versatile, free tier) |
+| Drag & Drop | @dnd-kit |
+| Deploy | Vercel (auto-deploy desde GitHub master) |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Prerrequisitos
 
-## Expanding the ESLint configuration
+- Node.js 20+
+- Cuenta en [Supabase](https://supabase.com) (proyecto `nbgpaylmrohdqzgaxxqh` ya configurado)
+- Cuenta en [Apify](https://apify.com) (para búsqueda de negocios)
+- API key de [Groq](https://console.groq.com) (free tier, para propuestas IA)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Quick Start
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+```bash
+# 1. Clonar
+git clone https://github.com/rai1001/ProspectOs.git
+cd ProspectOs
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+# 2. Instalar dependencias
+npm install
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# 3. Configurar variables de entorno
+cp .env.example .env.local
+# Editar .env.local con los valores reales (ver sección Configuración abajo)
+
+# 4. Arrancar en desarrollo
+npm run dev
+# → http://localhost:5173
+
+# 5. Login con magic link
+# Introduce tu email en la pantalla de login → revisa tu bandeja de entrada
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Configuración
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Variables de entorno (.env.local)
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+VITE_SUPABASE_URL=https://[project-ref].supabase.co
+VITE_SUPABASE_ANON_KEY=[anon-key]
+```
+
+**Dónde encontrar estos valores:**
+- Ve a https://supabase.com/dashboard/project/nbgpaylmrohdqzgaxxqh/settings/api
+- `VITE_SUPABASE_URL` → "Project URL"
+- `VITE_SUPABASE_ANON_KEY` → "Project API Keys" → "anon public"
+
+### API Keys en Settings de la app
+
+Groq y Apify van en **Settings dentro de la app** (no en .env), porque pueden cambiar sin redeploy:
+
+- **Apify token**: https://my.apify.com/account/integrations
+- **Groq API key**: https://console.groq.com/keys
+
+Tras el primer login, ve a `/settings` para guardarlas.
+
+### Base de datos (Supabase)
+
+El proyecto `nbgpaylmrohdqzgaxxqh` ya tiene el schema aplicado. Para recrearlo desde cero:
+
+```bash
+# Opción A: Supabase CLI
+npm install -g supabase
+supabase login
+supabase link --project-ref nbgpaylmrohdqzgaxxqh
+supabase db push
+
+# Opción B: Manual
+# Copia supabase/migrations/20260405100000_initial_schema.sql
+# → SQL Editor en https://supabase.com/dashboard/project/nbgpaylmrohdqzgaxxqh/sql
+```
+
+## Arquitectura
+
+```
+src/
+├── pages/          # Pantallas principales
+│   ├── Radar.tsx       → Búsqueda Apify + entrada manual de negocios
+│   ├── Pipeline.tsx    → Kanban drag-and-drop con 7 estados
+│   ├── Propuestas.tsx  → Generación de propuestas con Groq
+│   └── Settings.tsx    → API keys + reglas de scoring
+├── components/     # UI compartida (Sidebar, CommandPalette, ScoreBadge, ...)
+├── hooks/          # Estado y datos
+│   ├── useLeads.ts         → CRUD de leads + scoring en tiempo real
+│   ├── useAuth.ts          → Magic link auth con Supabase
+│   └── useScoringRules.ts  → Reglas editables desde Settings
+├── utils/          # Lógica de negocio
+│   ├── scoring.ts          → Evaluación de condiciones (no_website, etc.)
+│   └── apify.ts            → Transformación de resultados Apify
+└── lib/
+    └── supabase.ts     → Cliente Supabase + tipos exportados
+```
+
+**Flujo principal:**
+```
+Apify API → apify.ts → businesses table → leads table ← useLeads → scoring.ts
+                                                                          ↓
+                                                                   ScoreBadge / Pipeline
+```
+
+**Para añadir una nueva feature:**
+- Nueva pantalla → `src/pages/` + route en `src/App.tsx`
+- Nuevo hook → `src/hooks/` (sigue el patrón de `useLeads.ts`)
+- Nuevo componente → `src/components/`
+
+## Scripts
+
+```bash
+npm run dev      # Desarrollo con hot reload (localhost:5173)
+npm run build    # Build de producción (TypeScript + Vite)
+npm run preview  # Preview del build local
+npm run lint     # ESLint
+```
+
+## Seguridad y limitaciones
+
+- **Uso personal exclusivo.** La Groq API key y el Apify token se guardan en `localStorage` del navegador y se usan directamente desde el frontend. Son visibles en DevTools. No compartir la app con terceros sin primero mover las keys a Supabase Edge Functions.
+- **RLS:** Las políticas de Supabase usan `auth.role() = 'authenticated'`. Cualquier usuario autenticado puede ver todos los datos. Solo dar acceso de magic link a tu propio email.
+
+## Deploy
+
+Push a `master` → Vercel auto-deploya en https://prospect-os-teal.vercel.app/
+
+Variables en Vercel: `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` (Dashboard → Settings → Environment Variables).

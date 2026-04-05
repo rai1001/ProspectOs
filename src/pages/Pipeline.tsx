@@ -258,8 +258,13 @@ export default function Pipeline() {
       (l.notes ?? '').replace(/,/g, ';'),
       l.created_at ? new Date(l.created_at).toLocaleDateString('es-ES') : '',
     ])
-    const csv = [header, ...rows].map(r => r.join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const escape = (v: string | number) => {
+      const s = String(v)
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
+    }
+    const csv = [header, ...rows].map(r => r.map(escape).join(',')).join('\n')
+    const BOM = '\uFEFF'
+    const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url; a.download = 'pipeline-prospectos.csv'; a.click()
@@ -275,7 +280,7 @@ export default function Pipeline() {
   )
 
   return (
-    <div className="flex-1 p-6 overflow-hidden flex flex-col">
+    <div className="flex-1 p-4 md:p-6 overflow-hidden flex flex-col">
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div>
@@ -291,7 +296,7 @@ export default function Pipeline() {
       </div>
 
       {/* Metrics */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <MetricCard label="Total leads" value={total} />
         <MetricCard label="Tasa de conversión" value={`${conversionRate}%`} sub={`${ganados} ganados`} />
         <MetricCard label="Pipeline value" value={totalPipelineValue > 0 ? `€${totalPipelineValue.toLocaleString('es-ES')}` : '—'} />
@@ -311,37 +316,86 @@ export default function Pipeline() {
           </button>
         </div>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex-1 overflow-x-auto pb-4">
-            <div className="flex gap-3 h-full" style={{ minWidth: `${LEAD_STATUSES.length * 220}px` }}>
-              {LEAD_STATUSES.map(status => {
-                const columnLeads = leads.filter(l => l.status === status)
-                return (
-                  <KanbanColumn
-                    key={status}
-                    status={status}
-                    leads={columnLeads}
-                    onView={lead => setSelectedLead(lead)}
-                    onDelete={async (id) => {
-                      await deleteLead(id)
-                      toast.success('Lead eliminado')
-                    }}
-                    onProposal={lead => navigate(`/propuestas?lead=${lead.id}`)}
-                  />
-                )
-              })}
-            </div>
+        <>
+          {/* Mobile: lista vertical por estado */}
+          <div className="md:hidden flex-1 overflow-y-auto space-y-2 pb-4">
+            {LEAD_STATUSES.map(status => {
+              const columnLeads = leads.filter(l => l.status === status)
+              if (columnLeads.length === 0) return null
+              return (
+                <div key={status}>
+                  <div className="flex items-center gap-2 mb-1.5 px-1">
+                    <StatusBadge status={status} />
+                    <span className="text-xs text-[#9ca3af] font-mono">{columnLeads.length}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {columnLeads.map(lead => (
+                      <div
+                        key={lead.id}
+                        className={cn(
+                          'bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-3 border-l-4',
+                          lead.score >= 70 ? 'border-l-green-400' : lead.score >= 40 ? 'border-l-amber-400' : 'border-l-zinc-600',
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-white truncate">{lead.business.name}</p>
+                            <SectorBadge sector={lead.business.sector} className="mt-0.5" />
+                          </div>
+                          <ScoreBadge score={lead.score} size="sm" />
+                        </div>
+                        <div className="flex gap-1 pt-2 border-t border-[#2a2a2a]">
+                          <button onClick={() => setSelectedLead(lead)} className="flex-1 flex items-center justify-center gap-1 text-xs text-[#9ca3af] hover:text-white py-1 rounded hover:bg-[#2a2a2a]">
+                            <Eye size={11} /> Ver
+                          </button>
+                          <button onClick={() => navigate(`/propuestas?lead=${lead.id}`)} className="flex-1 flex items-center justify-center gap-1 text-xs text-[#9ca3af] hover:text-amber-400 py-1 rounded hover:bg-[#2a2a2a]">
+                            <FileText size={11} /> Propuesta
+                          </button>
+                          <button onClick={async () => { await deleteLead(lead.id); toast.success('Lead eliminado') }} className="flex items-center justify-center gap-1 text-xs text-[#9ca3af] hover:text-red-400 py-1 px-2 rounded hover:bg-[#2a2a2a]">
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
 
-          <DragOverlay>
-            {activeLead && (
-              <div className="bg-[#1a1a1a] border border-amber-500/40 rounded-lg p-3 w-52 shadow-2xl opacity-90">
-                <p className="text-sm font-medium text-white truncate">{activeLead.business.name}</p>
-                <ScoreBadge score={activeLead.score} size="sm" />
+          {/* Desktop: kanban drag & drop */}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+            <div className="hidden md:flex flex-1 overflow-x-auto pb-4">
+              <div className="flex gap-3 h-full" style={{ minWidth: `${LEAD_STATUSES.length * 220}px` }}>
+                {LEAD_STATUSES.map(status => {
+                  const columnLeads = leads.filter(l => l.status === status)
+                  return (
+                    <KanbanColumn
+                      key={status}
+                      status={status}
+                      leads={columnLeads}
+                      onView={lead => setSelectedLead(lead)}
+                      onDelete={async (id) => {
+                        await deleteLead(id)
+                        toast.success('Lead eliminado')
+                      }}
+                      onProposal={lead => navigate(`/propuestas?lead=${lead.id}`)}
+                    />
+                  )
+                })}
               </div>
-            )}
-          </DragOverlay>
-        </DndContext>
+            </div>
+
+            <DragOverlay>
+              {activeLead && (
+                <div className="bg-[#1a1a1a] border border-amber-500/40 rounded-lg p-3 w-52 shadow-2xl opacity-90">
+                  <p className="text-sm font-medium text-white truncate">{activeLead.business.name}</p>
+                  <ScoreBadge score={activeLead.score} size="sm" />
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
+        </>
       )}
 
       {selectedLead && (
