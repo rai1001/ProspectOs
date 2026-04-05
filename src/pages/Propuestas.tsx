@@ -140,8 +140,12 @@ export default function Propuestas() {
   const handleSaveToLead = async () => {
     if (!selectedLead || !content) return
     setSaving(true)
-    await updateLead(selectedLead.id, { notes: selectedLead.notes ?? '' })
-    toast.success('Propuesta guardada en el lead')
+    const existing = selectedLead.notes?.trim() ?? ''
+    const header = `[Propuesta ${SERVICE_LABELS[service]} · ${TONE_LABELS[tone]}]`
+    const newNotes = existing ? `${existing}\n\n---\n${header}\n${content}` : `${header}\n${content}`
+    const { error } = await updateLead(selectedLead.id, { notes: newNotes })
+    if (error) toast.error('Error al guardar')
+    else toast.success('Propuesta guardada en las notas del lead')
     setSaving(false)
   }
 

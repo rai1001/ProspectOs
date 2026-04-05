@@ -76,11 +76,23 @@ export async function searchWithApify(
     countryCode: 'es',
   }
 
-  const response = await fetch(runUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 60_000)
+
+  let response: Response
+  try {
+    response = await fetch(runUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+  } catch (err: any) {
+    if (err.name === 'AbortError') throw new Error('La búsqueda tardó demasiado (>60s). Intenta de nuevo.')
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
 
   if (!response.ok) {
     const text = await response.text()

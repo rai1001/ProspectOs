@@ -9,6 +9,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  useDroppable,
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -219,14 +220,14 @@ export default function Pipeline() {
     setActiveId(null)
     const { active, over } = e
     if (!over || active.id === over.id) return
-    // over.id is the column status string when dropped on a column droppable
     const newStatus = over.id as LeadStatus
-    if (LEAD_STATUSES.includes(newStatus)) {
-      await updateLead(String(active.id), {
-        status: newStatus,
-        last_contact_date: new Date().toISOString(),
-      })
-    }
+    if (!LEAD_STATUSES.includes(newStatus)) return
+    const currentLead = leads.find(l => l.id === String(active.id))
+    if (!currentLead || currentLead.status === newStatus) return
+    await updateLead(String(active.id), {
+      status: newStatus,
+      last_contact_date: new Date().toISOString(),
+    })
   }
 
   // Metrics
@@ -345,6 +346,7 @@ export default function Pipeline() {
 
       {selectedLead && (
         <LeadPanel
+          key={selectedLead.id}
           lead={selectedLead}
           onClose={() => setSelectedLead(null)}
           onUpdate={updateLead}
@@ -367,7 +369,7 @@ function KanbanColumn({
   onDelete: (id: string) => void
   onProposal: (l: LeadWithBusiness) => void
 }) {
-  const { setNodeRef } = useSortable({ id: status })
+  const { setNodeRef } = useDroppable({ id: status })
 
   return (
     <div ref={setNodeRef} className="w-52 flex-shrink-0 flex flex-col bg-[#111] rounded-lg border border-[#2a2a2a]">

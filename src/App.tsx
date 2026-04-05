@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
+import { CommandPalette } from './components/CommandPalette'
 import { Toaster } from './components/Toast'
 import { useAuth } from './hooks/useAuth'
 import Login from './pages/Login'
@@ -11,6 +13,18 @@ import { Loader2 } from 'lucide-react'
 
 function AppShell() {
   const { session, loading } = useAuth()
+  const [cmdOpen, setCmdOpen] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setCmdOpen(o => !o)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   if (loading) {
     return (
@@ -24,7 +38,7 @@ function AppShell() {
 
   return (
     <div className="flex min-h-screen bg-[#0f0f0f]">
-      <Sidebar />
+      <Sidebar onOpenCmd={() => setCmdOpen(true)} />
       <main className="flex-1 ml-16 md:ml-56 flex flex-col">
         <Routes>
           <Route path="/" element={<Navigate to="/radar" replace />} />
@@ -34,6 +48,7 @@ function AppShell() {
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </main>
+      {cmdOpen && <CommandPalette onClose={() => setCmdOpen(false)} />}
     </div>
   )
 }
