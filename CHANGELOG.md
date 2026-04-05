@@ -1,5 +1,20 @@
 # Changelog — ProspectOS
 
+## [v1.2] — 2026-04-05 (Lead Intelligence & Inbound)
+
+Implementación completa de captura inteligente de leads y "Radar de Dolor" multi-fuente.
+
+### Funcionalidades Añadidas (Fases 1-5)
+- **Soporte Multimodelo IA**: Infraestructura agnóstica para seleccionar entre Groq, Gemini, Claude u OpenAI (vía la configuración global de la app y `localStorage`).
+- **Auditoría de IA en Pipeline (Fase 1)**: Opción "Auditar con IA" que analiza la página del negocio extrayendo su Stack Tecnológico, y detectando carencias de Chatbots u optimización.
+- **Radar de Dolor (Fase 2 y 3)**: Búsqueda profunda en Google Maps que analiza vía IA (hasta 10) de las últimas reseñas negativas (<4.5). Añadidos distintivos visuales (borde rojo parpadeante "Lead de fuego") e incluye un botón combi "➕ + Kit" para meter al pipeline y auto-generar propuesta al mismo tiempo.
+- **Scraping de Instagram por Hashtag (Fase 4)**: Busca negocios en local por un hashtag específico de IG. Identifica qué perfiles tienen Linktree o carecen de Web, etiquetándolas como grandes presas de alto valor para agencias de IA.
+- **Portal Inbound lead-magnet (Fase 5)**: Nueva vista pública sin auth en `/auditoria-gratis` que evalúa la web del cliente a través de Gemini y silenciosamente mete su contacto en el Pipeline en estado de "nuevo" tras captar el número móvil en un CTA.
+
+### Arreglos y Refactor
+- **Fix 400 Insert**: Los campos de reseñas devueltos por la API de deep-scraping de Apify se saneaban localmente para evitar choque 400 Bad Request contra Supabase REST en `addBusinessAndLead()`.
+- **Scoring en Tiempo Real**: Añadidas nuevas reglas que suben los puntos del lead tras ser analizados (`no_chatbot` +20, `has_pain_points` +30, `web_slow_or_old` +15).
+
 ## [v1.1] — 2026-04-05 (en progreso)
 
 Según el CEO plan del 2026-04-05:
