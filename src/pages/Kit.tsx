@@ -11,7 +11,7 @@ import { useLeads, type LeadWithBusiness } from '../hooks/useLeads'
 import { supabase, type ImplementationKit } from '../lib/supabase'
 import type { Json as SupabaseJson } from '../types/database'
 import { useAIProvider } from '../hooks/useAIProvider'
-import { generateText, PROVIDER_LABELS } from '../utils/ai'
+import { generateText, sanitizeForPrompt, PROVIDER_LABELS } from '../utils/ai'
 
 type TabKey = 'agent' | 'web'
 type Json = Record<string, unknown>  // local alias for kit content shaping
@@ -59,7 +59,16 @@ Responde SOLO con el JSON, sin explicaciones ni markdown.`
 
 function buildKitPrompt(lead: LeadWithBusiness, tab: TabKey, ragContext: string): string {
   const b = lead.business
-  const webStatus = b.website ? `Tiene web: ${b.website}` : 'No tiene página web'
+  // SEC: sanitize all user-controlled fields before embedding in the prompt.
+  // XML delimiters signal to the model that the content is data, not instructions.
+  const name    = sanitizeForPrompt(b.name, 200)
+  const sector  = sanitizeForPrompt(b.sector, 100)
+  const address = sanitizeForPrompt(b.address ?? 'desconocida', 300)
+  const phone   = sanitizeForPrompt(b.phone ?? 'desconocido', 30)
+  const notes   = sanitizeForPrompt(lead.notes ?? '', 1000)
+  const website = b.website ? sanitizeForPrompt(b.website, 300) : null
+
+  const webStatus = website ? `Tiene web: <website>${website}</website>` : 'No tiene página web'
   const ratingLine = b.google_rating != null
     ? `Rating Google: ${b.google_rating} (${b.review_count ?? '?'} reseñas)`
     : 'Rating Google: desconocido'
@@ -70,13 +79,13 @@ function buildKitPrompt(lead: LeadWithBusiness, tab: TabKey, ragContext: string)
 
   return `Genera un kit de ${tab === 'agent' ? 'agente IA (n8n + Make)' : 'página web (Antigravity + Freepik)'} para:
 
-Nombre: ${b.name}
-Sector: ${b.sector}
-Dirección: ${b.address ?? 'desconocida'}
+<business_name>${name}</business_name>
+<sector>${sector}</sector>
+<address>${address}</address>
 ${webStatus}
 ${ratingLine}
-Teléfono: ${b.phone ?? 'desconocido'}
-Notas: ${lead.notes || 'sin notas'}${ragSection}`
+<phone>${phone}</phone>
+<notes>${notes || 'sin notas'}</notes>${ragSection}`
 }
 
 // Direct sector/category filtering (Groq removed embedding models as of 2026-04)

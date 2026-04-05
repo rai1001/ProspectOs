@@ -1,6 +1,27 @@
 export type AIProvider = 'groq' | 'openai' | 'claude' | 'gemini'
 
 /**
+ * Sanitize a user-controlled string before embedding it in an LLM prompt.
+ *
+ * Defenses applied:
+ * 1. Length cap — prevents runaway context stuffing
+ * 2. Control-character stripping — removes null bytes and other non-printable
+ *    chars that could confuse tokenizers or hide injected content
+ * 3. Newline normalization — collapses CRLF so multi-line injections don't
+ *    break the surrounding prompt structure
+ *
+ * Callers should also wrap the value in XML delimiters in the prompt template
+ * (e.g. <business_name>…</business_name>) to signal to the model that the
+ * enclosed text is *data*, not instructions.
+ */
+export function sanitizeForPrompt(value: string, maxLen = 500): string {
+  return value
+    .slice(0, maxLen)
+    .replace(/\r\n|\r/g, '\n')                       // normalize line endings
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '') // strip control chars
+}
+
+/**
  * Safely parse LLM JSON output with optional type coercion for booleans.
  * Strips markdown wrappers. Returns null if parsing fails.
  */
