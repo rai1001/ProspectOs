@@ -10,6 +10,7 @@ export default function AuditoriaGratis() {
   const [phone, setPhone] = useState('')
   const [auditing, setAuditing] = useState(false)
   const [result, setResult] = useState<WebAuditResult | null>(null)
+  const [auditError, setAuditError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
@@ -21,6 +22,7 @@ export default function AuditoriaGratis() {
     if (!url.trim()) return
     setAuditing(true)
     setResult(null)
+    setAuditError(null)
 
     try {
       let fullUrl = url.trim()
@@ -28,17 +30,7 @@ export default function AuditoriaGratis() {
       const auditResult = await auditWebsite(fullUrl, 'gemini', GEMINI_KEY)
       setResult(auditResult)
     } catch {
-      setResult({
-        has_chatbot: false,
-        has_booking_widget: false,
-        uses_wordpress: false,
-        has_meta_pixel: false,
-        has_analytics: false,
-        mobile_friendly: false,
-        quality_score: 0,
-        issues: ['No se pudo analizar la web. Verifica la URL e intenta de nuevo.'],
-        technologies: [],
-      })
+      setAuditError('No se pudo analizar la web. Verifica la URL e intenta de nuevo.')
     } finally {
       setAuditing(false)
     }
@@ -97,7 +89,7 @@ export default function AuditoriaGratis() {
       </div>
 
       {/* Form */}
-      {!result && (
+      {!result && !auditError && (
         <form onSubmit={handleAudit} className="w-full max-w-md space-y-4">
           <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-6 space-y-4">
             <div>
@@ -134,6 +126,22 @@ export default function AuditoriaGratis() {
             </button>
           </div>
         </form>
+      )}
+
+      {/* Error state */}
+      {auditError && !result && (
+        <div className="w-full max-w-md">
+          <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-6 text-center space-y-3">
+            <AlertTriangle size={32} className="mx-auto text-red-400" />
+            <p className="text-sm text-red-200">{auditError}</p>
+            <button
+              onClick={() => { setAuditError(null) }}
+              className="text-xs text-amber-400 hover:text-amber-300 underline"
+            >
+              Intentar de nuevo
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Results */}
