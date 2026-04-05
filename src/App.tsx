@@ -37,6 +37,20 @@ class ConfigErrorBoundary extends Component<{ children: ReactNode }, { error: Er
   }
 }
 
+function NotFound() {
+  return (
+    <div className="flex-1 flex items-center justify-center p-8">
+      <div className="text-center space-y-3">
+        <p className="text-4xl font-mono font-bold text-[#4a4a4a]">404</p>
+        <p className="text-sm text-[#9ca3af]">Esta página no existe.</p>
+        <a href="/radar" className="inline-block text-xs text-amber-400 hover:text-amber-300 underline">
+          Volver al Radar
+        </a>
+      </div>
+    </div>
+  )
+}
+
 function AppShell() {
   const { session, loading } = useAuth()
   const [cmdOpen, setCmdOpen] = useState(false)
@@ -73,6 +87,7 @@ function AppShell() {
           <Route path="/propuestas" element={<Propuestas />} />
           <Route path="/kit" element={<Kit />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
       {cmdOpen && <CommandPalette onClose={() => setCmdOpen(false)} />}
