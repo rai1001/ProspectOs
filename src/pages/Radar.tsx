@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { Search, Plus, Globe, Phone, Star, AlertCircle, Loader2 } from 'lucide-react'
+import { Search, Plus, Globe, Phone, Star, AlertCircle, Loader2, Flame } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { ScoreBadge } from '../components/ScoreBadge'
 import { SectorBadge } from '../components/SectorBadge'
 import { toast } from '../components/Toast'
-import { searchWithApify } from '../utils/apify'
+import { searchWithApify, searchWithApifyDeep, type ApifySearchResult, type ApifyReview } from '../utils/apify'
+import { generateText } from '../utils/ai'
+import { useAIProvider } from '../hooks/useAIProvider'
 import { calculateScore } from '../utils/scoring'
 import { useScoringRules } from '../hooks/useScoringRules'
 import { useLeads } from '../hooks/useLeads'
@@ -12,11 +14,12 @@ import type { BusinessInsert } from '../lib/supabase'
 import type { Sector } from '../constants/sectors'
 import { SECTORS } from '../constants/sectors'
 
-type Tab = 'apify' | 'manual'
+type Tab = 'apify' | 'dolor' | 'manual'
 
 interface SearchResult {
-  data: Omit<BusinessInsert, 'sector'> & { sector: Sector }
+  data: ApifySearchResult
   alreadyAdded?: boolean
+  painAnalysis?: { has_complaints: boolean; summary: string }
 }
 
 export default function Radar() {
@@ -29,6 +32,12 @@ export default function Radar() {
 
   const { rules } = useScoringRules()
   const { leads, addBusinessAndLead } = useLeads()
+  const { provider, apiKey } = useAIProvider()
+
+  const [dolorQuery, setDolorQuery] = useState('')
+  const [searchingDolor, setSearchingDolor] = useState(false)
+  const [dolorProgress, setDolorProgress] = useState('')
+  const [dolorResults, setDolorResults] = useState<SearchResult[]>([])
 
   const existingPlaceIds = new Set(leads.map(l => l.business.place_id).filter(Boolean))
 
@@ -50,10 +59,83 @@ export default function Radar() {
       if (items.length === 0) {
         toast.info('No se encontraron resultados para esa búsqueda')
       }
-    } catch (err: any) {
-      toast.error(err.message ?? 'Error al buscar en Apify')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error al buscar en Apify')
     } finally {
       setSearching(false)
+    }
+  }
+
+  // ── Deep search + AI review analysis ───────────────────────────
+  const handleDolorSearch = async () => {
+    if (!dolorQuery.trim()) return
+    if (!apifyToken) { toast.error('Introduce tu Apify API token primero'); return }
+    if (!apiKey) { toast.error('Configura tu API key en Ajustes'); return }
+    localStorage.setItem('prospectOS_apify_token', apifyToken)
+    setSearchingDolor(true)
+    setDolorResults([])
+    setDolorProgress('Buscando negocios con reseñas...')
+
+    try {
+      const items = await searchWithApifyDeep(dolorQuery, apifyToken)
+      if (items.length === 0) {
+        toast.info('No se encontraron negocios con rating < 4.5')
+        setSearchingDolor(false)
+        return
+      }
+
+      setDolorProgress(`Analizando reseñas de ${items.length} negocios con IA...`)
+
+      // Analyze reviews with AI in batches
+      const analyzed: SearchResult[] = []
+      for (const item of items) {
+        const reviews = (item.reviews ?? []).filter((r: ApifyReview) => r.text)
+        let painAnalysis = { has_complaints: false, summary: '' }
+
+        if (reviews.length > 0) {
+          const reviewText = reviews.map((r: ApifyReview) => `[${r.stars}★] ${r.text}`).join('\n')
+          try {
+            const aiResponse = await generateText({
+              provider,
+              apiKey,
+              systemPrompt: `Analiza estas reseñas de un negocio local y devuelve SOLO un JSON válido (sin markdown):
+{"has_complaints": boolean, "summary": "resumen de 1 línea en español de las quejas principales"}
+Busca quejas sobre: atención al cliente mala, no cogen el teléfono, tardan en responder, esperas largas, trato descortés, reservas que fallan. Si no hay quejas claras, pon has_complaints: false.`,
+              userPrompt: `Negocio: ${item.name}\nReseñas:\n${reviewText}`,
+              maxTokens: 200,
+            })
+
+            let jsonStr = aiResponse.trim()
+            if (jsonStr.startsWith('```')) jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
+            painAnalysis = JSON.parse(jsonStr)
+          } catch {
+            // If AI fails for this one, continue
+          }
+        }
+
+        analyzed.push({
+          data: item,
+          alreadyAdded: Boolean(item.place_id && existingPlaceIds.has(item.place_id)),
+          painAnalysis,
+        })
+        setDolorProgress(`Analizado ${analyzed.length}/${items.length}...`)
+      }
+
+      // Sort: pain leads first
+      analyzed.sort((a, b) => {
+        if (a.painAnalysis?.has_complaints && !b.painAnalysis?.has_complaints) return -1
+        if (!a.painAnalysis?.has_complaints && b.painAnalysis?.has_complaints) return 1
+        return 0
+      })
+
+      setDolorResults(analyzed)
+      const painCount = analyzed.filter(r => r.painAnalysis?.has_complaints).length
+      toast.success(`Encontrados ${painCount} leads con quejas de ${analyzed.length} analizados`)
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Error en la búsqueda profunda')
+    } finally {
+      setSearchingDolor(false)
+      setDolorProgress('')
     }
   }
 
@@ -104,18 +186,19 @@ export default function Radar() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-[#1a1a1a] rounded-lg p-1 w-fit mb-6 border border-[#2a2a2a]">
-        {(['apify', 'manual'] as Tab[]).map(t => (
+        {(['apify', 'dolor', 'manual'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={cn(
-              'px-4 py-1.5 rounded-md text-sm font-medium transition-colors',
+              'px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5',
               tab === t
                 ? 'bg-amber-500 text-black'
                 : 'text-[#9ca3af] hover:text-white',
             )}
           >
-            {t === 'apify' ? 'Búsqueda Apify' : 'Entrada manual'}
+            {t === 'dolor' && <Flame size={13} />}
+            {t === 'apify' ? 'Búsqueda Apify' : t === 'dolor' ? 'Búsqueda Dolor' : 'Entrada manual'}
           </button>
         ))}
       </div>
@@ -231,6 +314,127 @@ export default function Radar() {
               <Search size={32} className="mx-auto mb-3 opacity-20" />
               <p className="text-sm font-medium text-white mb-1">Busca negocios en A Coruña</p>
               <p className="text-xs">Ejemplos: "restaurantes", "peluquerías", "talleres mecánicos"</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Dolor (Deep) tab ────────────────────────────────────── */}
+      {tab === 'dolor' && (
+        <div>
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-4 mb-4">
+            <p className="text-xs text-amber-400 mb-2 flex items-center gap-1.5">
+              <Flame size={12} /> Búsqueda profunda: extrae reseñas recientes y detecta negocios con quejas de atención al cliente.
+            </p>
+            <p className="text-[10px] text-[#9ca3af] mb-3">
+              Coste mayor (~€0.05/búsqueda). Filtra automáticamente a negocios con rating {'<'} 4.5. Análisis con {provider.toUpperCase()}.
+            </p>
+            <label className="block text-xs text-[#9ca3af] mb-1.5 font-medium">Apify API Token</label>
+            <input
+              type="password"
+              value={apifyToken}
+              onChange={e => setApifyToken(e.target.value)}
+              placeholder="apify_api_xxxxx"
+              className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-white placeholder-[#4a4a4a] focus:outline-none focus:border-amber-500 mb-3"
+            />
+          </div>
+
+          <div className="flex gap-2 mb-6">
+            <input
+              type="text"
+              value={dolorQuery}
+              onChange={e => setDolorQuery(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleDolorSearch()}
+              placeholder="restaurantes, clínicas, talleres..."
+              className="flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-4 py-2.5 text-sm text-white placeholder-[#4a4a4a] focus:outline-none focus:border-amber-500"
+            />
+            <button
+              onClick={handleDolorSearch}
+              disabled={searchingDolor || !dolorQuery.trim()}
+              className="flex items-center gap-2 bg-red-500 hover:bg-red-600 disabled:opacity-40 text-white font-medium text-sm rounded-lg px-4 py-2.5 transition-colors"
+            >
+              {searchingDolor ? <Loader2 size={16} className="animate-spin" /> : <Flame size={16} />}
+              Buscar dolor
+            </button>
+          </div>
+
+          {searchingDolor && dolorProgress && (
+            <div className="flex items-center gap-2 mb-4 text-sm text-amber-400">
+              <Loader2 size={14} className="animate-spin" /> {dolorProgress}
+            </div>
+          )}
+
+          {dolorResults.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {dolorResults.map(result => {
+                const key = result.data.place_id ?? result.data.name
+                const score = calculateScore(result.data as any, rules)
+                const isPain = result.painAnalysis?.has_complaints
+                return (
+                  <div
+                    key={key}
+                    className={cn(
+                      'bg-[#1a1a1a] border rounded-lg p-4 border-l-4',
+                      isPain
+                        ? 'border-red-500 border-l-red-500 animate-pulse-slow'
+                        : 'border-[#2a2a2a] border-l-zinc-600',
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm text-white truncate flex items-center gap-1">
+                          {isPain && <Flame size={12} className="text-red-400 flex-shrink-0" />}
+                          {result.data.name}
+                        </p>
+                        <p className="text-xs text-[#9ca3af] truncate mt-0.5">{result.data.address}</p>
+                      </div>
+                      <ScoreBadge score={score} size="sm" />
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      <SectorBadge sector={result.data.sector} />
+                      {result.data.google_rating && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs bg-yellow-500/10 text-yellow-300 border-yellow-500/20">
+                          <Star size={10} /> {result.data.google_rating}
+                        </span>
+                      )}
+                    </div>
+
+                    {isPain && result.painAnalysis?.summary && (
+                      <div className="bg-red-500/10 border border-red-500/20 rounded px-3 py-2 mb-3">
+                        <p className="text-[10px] text-red-300 uppercase tracking-wider mb-0.5">Quejas detectadas</p>
+                        <p className="text-xs text-red-200">{result.painAnalysis.summary}</p>
+                      </div>
+                    )}
+
+                    {result.alreadyAdded ? (
+                      <span className="inline-block text-xs text-amber-400 font-medium">Ya en pipeline</span>
+                    ) : (
+                      <button
+                        onClick={() => handleAddResult(result)}
+                        disabled={addingId === key}
+                        className={cn(
+                          'w-full flex items-center justify-center gap-1.5 text-xs font-medium rounded px-3 py-1.5 transition-colors disabled:opacity-40',
+                          isPain
+                            ? 'bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30'
+                            : 'bg-[#2a2a2a] hover:bg-[#333] text-white',
+                        )}
+                      >
+                        {addingId === key ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                        {isPain ? 'Añadir Lead de Fuego' : 'Añadir al pipeline'}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {!searchingDolor && dolorResults.length === 0 && !dolorQuery && (
+            <div className="text-center py-16 text-[#9ca3af]">
+              <Flame size={32} className="mx-auto mb-3 opacity-20" />
+              <p className="text-sm font-medium text-white mb-1">Detecta negocios que necesitan ayuda urgente</p>
+              <p className="text-xs">Busca por sector y la IA analizará las reseñas para encontrar quejas de atención</p>
             </div>
           )}
         </div>
