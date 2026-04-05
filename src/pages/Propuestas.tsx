@@ -62,7 +62,7 @@ export default function Propuestas() {
   const [selectedLeadId, setSelectedLeadId] = useState<string>(searchParams.get('lead') ?? '')
   const [service, setService] = useState<ServiceType>('agente_ia')
   const [tone, setTone] = useState<Tone>('cercano')
-  const [claudeKey, setClaudeKey] = useState(() => localStorage.getItem('prospectOS_claude_key') ?? '')
+  const [claudeKey, setClaudeKey] = useState(() => localStorage.getItem('prospectOS_groq_key') ?? '')
   const [generating, setGenerating] = useState(false)
   const [content, setContent] = useState('')
   const [saving, setSaving] = useState(false)
@@ -80,46 +80,47 @@ export default function Propuestas() {
 
   const handleGenerate = async () => {
     if (!selectedLead || !claudeKey) return
-    localStorage.setItem('prospectOS_claude_key', claudeKey)
+    localStorage.setItem('prospectOS_groq_key', claudeKey)
     setGenerating(true)
     setContent('')
 
     const prompt = buildPrompt(selectedLead, service, tone)
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'x-api-key': claudeKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-          'anthropic-dangerous-direct-browser-calls': 'true',
+          'Authorization': `Bearer ${claudeKey}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model: 'llama-3.3-70b-versatile',
           max_tokens: 1024,
-          system: SYSTEM_PROMPT,
-          messages: [{ role: 'user', content: prompt }],
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: prompt },
+          ],
         }),
       })
 
       if (!response.ok) {
         const err = await response.json()
-        if (response.status === 401) throw new Error('API key de Anthropic inválida')
+        if (response.status === 401) throw new Error('API key de Groq inválida')
         throw new Error(err.error?.message ?? `Error ${response.status}`)
       }
 
       const data = await response.json()
-      setContent(data.content[0].text)
+      const text = data.choices[0].message.content
+      setContent(text)
 
       // Save proposal to DB
       await supabase.from('proposals').insert({
         lead_id: selectedLead.id,
         service_type: service,
         tone,
-        model_used: 'claude-sonnet-4-20250514',
+        model_used: 'llama-3.3-70b-versatile',
         prompt_used: prompt,
-        content: data.content[0].text,
+        content: text,
       })
     } catch (err: any) {
       toast.error(err.message ?? 'Error al generar la propuesta')
@@ -155,18 +156,18 @@ export default function Propuestas() {
 
       {/* API Key */}
       <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-4 mb-5">
-        <label className="block text-xs text-[#9ca3af] mb-1.5 font-medium">Anthropic API Key</label>
+        <label className="block text-xs text-[#9ca3af] mb-1.5 font-medium">Groq API Key</label>
         <input
           type="password"
           value={claudeKey}
           onChange={e => setClaudeKey(e.target.value)}
-          placeholder="sk-ant-xxxxx"
+          placeholder="gsk_xxxxx"
           className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-3 py-2 text-sm text-white placeholder-[#4a4a4a] focus:outline-none focus:border-amber-500"
         />
         {!claudeKey && (
           <p className="text-xs text-[#9ca3af] mt-1.5 flex items-center gap-1">
             <AlertCircle size={12} />
-            Necesitas una API key de Anthropic. Se guarda localmente.
+            Necesitas una API key de Groq (gratis en console.groq.com). Se guarda localmente.
           </p>
         )}
       </div>
