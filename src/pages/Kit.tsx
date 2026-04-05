@@ -212,7 +212,11 @@ export default function Kit() {
         setKit(parsed)
       }
 
-      const kitContent = (parsed ?? { _raw: text }) as unknown as SupabaseJson
+      const agencyPhone = localStorage.getItem('prospectOS_agency_phone') ?? undefined
+      const kitContent = {
+        ...(parsed ?? { _raw: text }),
+        ...(agencyPhone ? { agency_phone: agencyPhone } : {}),
+      } as unknown as SupabaseJson
       const { data: saved, error: saveErr } = await supabase
         .from('implementation_kits')
         .insert({

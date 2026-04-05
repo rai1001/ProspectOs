@@ -55,7 +55,7 @@ export default function Share() {
   }
 
   const summary = (kit.content as { client_summary?: { business_name?: string; headline?: string; what_it_does?: string; what_they_need_to_do?: string; cta?: string } }).client_summary
-  const agencyPhone = localStorage.getItem('prospectOS_agency_phone') ?? ''
+  const agencyPhone = (kit.content as { agency_phone?: string }).agency_phone ?? ''
 
   const waUrl = agencyPhone
     ? `https://wa.me/${agencyPhone.replace(/\D/g, '')}?text=${encodeURIComponent(
