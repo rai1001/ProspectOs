@@ -102,13 +102,35 @@ async function queryRAG(sector: string, category: string): Promise<string> {
   return data.map(r => `### ${r.title}\n${JSON.stringify(r.content, null, 2)}`).join('\n\n')
 }
 
+/**
+ * Extracts the first complete, balanced JSON object from a string.
+ *
+ * Uses a bracket counter instead of a greedy regex. The greedy pattern
+ * /\{[\s\S]*\}/ matches from the FIRST '{' to the LAST '}', which breaks
+ * when an LLM appends prose after the JSON object (e.g. "Here is your kit:
+ * {...} Note: {something}"). The counter stops at the first balanced '}'.
+ */
+function extractFirstJsonObject(text: string): string | null {
+  const start = text.indexOf('{')
+  if (start === -1) return null
+  let depth = 0
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === '{') depth++
+    else if (text[i] === '}') {
+      depth--
+      if (depth === 0) return text.slice(start, i + 1)
+    }
+  }
+  return null
+}
+
 function parseKitJSON(text: string): Json | null {
   try {
     return JSON.parse(text)
   } catch {
-    const match = text.match(/\{[\s\S]*\}/)
-    if (match) {
-      try { return JSON.parse(match[0]) } catch { /* fallthrough */ }
+    const extracted = extractFirstJsonObject(text)
+    if (extracted) {
+      try { return JSON.parse(extracted) } catch { /* fallthrough */ }
     }
     return null
   }
@@ -168,27 +190,26 @@ export default function Kit() {
   const [autoTriggered, setAutoTriggered] = useState(false)
 
   // Auto-generate when arriving from Radar with ?auto=agent
+  // Passes tabOverride directly to handleGenerate — no DOM manipulation,
+  // no arbitrary setTimeout, no fragile getElementById.
   useEffect(() => {
     const autoTab = searchParams.get('auto') as TabKey | null
     if (autoTab && selectedLead && apiKey && !autoTriggered) {
       setAutoTriggered(true)
       setActiveTab(autoTab)
-      // Remove auto param from URL
       const next = new URLSearchParams(searchParams)
       next.delete('auto')
       setSearchParams(next, { replace: true })
-      // Trigger generation on next tick (after state settles)
-      setTimeout(() => {
-        document.getElementById('kit-generate-btn')?.click()
-      }, 100)
+      handleGenerate(autoTab)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLead, apiKey, searchParams, autoTriggered, setSearchParams])
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (tabOverride?: TabKey) => {
     if (!selectedLead || !apiKey) return
     // API key already persisted by useAIProvider hook — don't overwrite wrong key
 
-    const tab = activeTab
+    const tab = tabOverride ?? activeTab
     const setGenerating = tab === 'agent' ? setGeneratingAgent : setGeneratingWeb
     const setKit = tab === 'agent' ? setAgentKit : setWebKit
     const setKitId = tab === 'agent' ? setAgentKitId : setWebKitId
