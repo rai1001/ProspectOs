@@ -11,6 +11,7 @@ import Propuestas from './pages/Propuestas'
 import Settings from './pages/Settings'
 import Kit from './pages/Kit'
 import Share from './pages/Share'
+import AuditoriaGratis from './pages/AuditoriaGratis'
 import { Loader2 } from 'lucide-react'
 
 class ConfigErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -85,6 +86,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/share/:kitId" element={<Share />} />
+          <Route path="/auditoria-gratis" element={<AuditoriaGratis />} />
           <Route path="*" element={<AppShell />} />
         </Routes>
         <Toaster
