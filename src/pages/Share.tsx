@@ -1,13 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { Loader2, MessageCircle, Wrench, Globe } from 'lucide-react'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-const anonClient = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null
+import { supabase } from '../lib/supabase'
 
 type Json = Record<string, unknown>
 
@@ -24,12 +18,12 @@ export default function Share() {
   const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
-    if (!kitId || !anonClient) {
+    if (!kitId) {
       setNotFound(true)
       setLoading(false)
       return
     }
-    anonClient
+    supabase
       .from('implementation_kits')
       .select('id, kit_type, content')
       .eq('id', kitId)
