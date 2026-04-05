@@ -27,6 +27,8 @@ import { supabase } from '../lib/supabase'
 import { LEAD_STATUSES, STATUS_LABELS, type LeadStatus } from '../constants/statuses'
 import { auditWebsite, type WebAuditResult } from '../utils/audit'
 import { useAIProvider } from '../hooks/useAIProvider'
+import { calculateScore } from '../utils/scoring'
+import { useScoringRules } from '../hooks/useScoringRules'
 
 // ─── Metric cards ───────────────────────────────────────────────
 function MetricCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
@@ -121,6 +123,7 @@ function LeadPanel({ lead, onClose, onUpdate }: {
   const [auditing, setAuditing] = useState(false)
   const [auditResult, setAuditResult] = useState<WebAuditResult | null>(null)
   const { provider, apiKey } = useAIProvider()
+  const { rules } = useScoringRules()
 
   const handleSave = async () => {
     setSaving(true)
@@ -177,14 +180,19 @@ function LeadPanel({ lead, onClose, onUpdate }: {
                 try {
                   const result = await auditWebsite(b.website!, provider, apiKey)
                   setAuditResult(result)
-                  // Save to DB
-                  await supabase.from('businesses').update({
-                    has_chatbot: result.has_chatbot,
-                    technologies: result.technologies as unknown as any,
-                    pain_points: result.issues as unknown as any,
-                    website_outdated: result.quality_score < 5,
+                  // Save audit data to business
+                  const { error: updateErr } = await supabase.from('businesses').update({
+                    has_chatbot: result.has_chatbot ?? false,
+                    technologies: Array.isArray(result.technologies) ? result.technologies : [],
+                    pain_points: Array.isArray(result.issues) ? result.issues : [],
+                    website_outdated: typeof result.quality_score === 'number' ? result.quality_score < 5 : false,
                   }).eq('id', b.id)
-                  toast.success('Auditoría completada')
+                  if (updateErr) { toast.error('Error al guardar auditoría'); return }
+                  // Recalculate score with new audit data
+                  const updatedBiz = { ...b, has_chatbot: result.has_chatbot, pain_points: result.issues, technologies: result.technologies, website_outdated: result.quality_score < 5 }
+                  const newScore = calculateScore(updatedBiz as any, rules)
+                  await supabase.from('leads').update({ score: newScore }).eq('id', lead.id)
+                  toast.success(`Auditoría completada — Score: ${newScore}`)
                 } catch (err: unknown) {
                   toast.error(err instanceof Error ? err.message : 'Error en la auditoría')
                 } finally {

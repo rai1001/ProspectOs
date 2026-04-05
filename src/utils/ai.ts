@@ -1,5 +1,22 @@
 export type AIProvider = 'groq' | 'openai' | 'claude' | 'gemini'
 
+/**
+ * Safely parse LLM JSON output with optional type coercion for booleans.
+ * Strips markdown wrappers. Returns null if parsing fails.
+ */
+export function parseLLMJson<T>(raw: string): T | null {
+  let jsonStr = raw.trim()
+  if (jsonStr.startsWith('```')) {
+    jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
+  }
+  try {
+    const parsed = JSON.parse(jsonStr)
+    return parsed as T
+  } catch {
+    return null
+  }
+}
+
 export const PROVIDER_LABELS: Record<AIProvider, string> = {
   groq: 'Groq — llama-3.3-70b',
   openai: 'OpenAI — gpt-4o-mini',

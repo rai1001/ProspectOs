@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import type { AIProvider } from '../utils/ai'
 
+const VALID_PROVIDERS: AIProvider[] = ['groq', 'openai', 'claude', 'gemini']
+
+function safeGetProvider(): AIProvider {
+  const stored = localStorage.getItem('prospectOS_ai_provider')
+  return stored && VALID_PROVIDERS.includes(stored as AIProvider) ? (stored as AIProvider) : 'groq'
+}
+
 const LS_PROVIDER = 'prospectOS_ai_provider'
 const LS_KEYS: Record<AIProvider, string> = {
   groq: 'prospectOS_groq_key',
@@ -10,11 +17,9 @@ const LS_KEYS: Record<AIProvider, string> = {
 }
 
 export function useAIProvider() {
-  const [provider, setProviderState] = useState<AIProvider>(
-    () => (localStorage.getItem(LS_PROVIDER) as AIProvider) ?? 'groq',
-  )
+  const [provider, setProviderState] = useState<AIProvider>(safeGetProvider)
   const [apiKey, setApiKeyState] = useState<string>(
-    () => localStorage.getItem(LS_KEYS[(localStorage.getItem(LS_PROVIDER) as AIProvider) ?? 'groq']) ?? '',
+    () => localStorage.getItem(LS_KEYS[safeGetProvider()]) ?? '',
   )
 
   const setProvider = (p: AIProvider) => {
