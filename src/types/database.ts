@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -62,6 +62,74 @@ export type Database = {
           source?: string
           website?: string | null
           website_outdated?: boolean | null
+        }
+        Relationships: []
+      }
+      implementation_kits: {
+        Row: {
+          content: Json
+          created_at: string | null
+          id: string
+          kit_type: string
+          lead_id: string | null
+          platform: string | null
+        }
+        Insert: {
+          content: Json
+          created_at?: string | null
+          id?: string
+          kit_type: string
+          lead_id?: string | null
+          platform?: string | null
+        }
+        Update: {
+          content?: Json
+          created_at?: string | null
+          id?: string
+          kit_type?: string
+          lead_id?: string | null
+          platform?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "implementation_kits_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      knowledge_base: {
+        Row: {
+          category: string
+          content: Json
+          created_at: string | null
+          embedding: string | null
+          id: string
+          platform: string | null
+          sector: string
+          title: string
+        }
+        Insert: {
+          category: string
+          content: Json
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          platform?: string | null
+          sector: string
+          title: string
+        }
+        Update: {
+          category?: string
+          content?: Json
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          platform?: string | null
+          sector?: string
+          title?: string
         }
         Relationships: []
       }
@@ -182,7 +250,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      match_knowledge_base: {
+        Args: {
+          match_category: string
+          match_count?: number
+          match_sector: string
+          query_embedding: string
+        }
+        Returns: {
+          content: Json
+          id: string
+          similarity: number
+          title: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

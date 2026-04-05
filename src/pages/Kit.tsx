@@ -9,10 +9,10 @@ import { SectorBadge } from '../components/SectorBadge'
 import { toast } from '../components/Toast'
 import { useLeads, type LeadWithBusiness } from '../hooks/useLeads'
 import { supabase } from '../lib/supabase'
+import type { Json as SupabaseJson } from '../types/database'
 
 type TabKey = 'agent' | 'web'
-type Json = Record<string, unknown>
-type KBResult = { id: string; title: string; content: Json; similarity: number }
+type Json = Record<string, unknown>  // local alias for kit content shaping
 
 const TABS: { key: TabKey; label: string; icon: typeof Wrench }[] = [
   { key: 'agent', label: 'Agente IA', icon: Wrench },
@@ -77,18 +77,15 @@ Teléfono: ${b.phone ?? 'desconocido'}
 Notas: ${lead.notes || 'sin notas'}${ragSection}`
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const db = supabase as any
-
 // Direct sector/category filtering (Groq removed embedding models as of 2026-04)
 // When an embedding provider is available, switch back to match_knowledge_base RPC
 async function queryRAG(sector: string, category: string): Promise<string> {
-  const { data } = await db
+  const { data } = await supabase
     .from('knowledge_base')
     .select('id, title, content')
     .eq('sector', sector)
     .eq('category', category)
-    .limit(3) as { data: KBResult[] | null; error: unknown }
+    .limit(3)
 
   if (!data || data.length === 0) return ''
   return data.map(r => `### ${r.title}\n${JSON.stringify(r.content, null, 2)}`).join('\n\n')
@@ -194,8 +191,8 @@ export default function Kit() {
       }
 
       // 4. Save to implementation_kits
-      const kitContent = parsed ?? { _raw: text }
-      const { data: saved, error: saveErr } = await db
+      const kitContent = (parsed ?? { _raw: text }) as unknown as SupabaseJson
+      const { data: saved, error: saveErr } = await supabase
         .from('implementation_kits')
         .insert({
           lead_id: selectedLead.id,

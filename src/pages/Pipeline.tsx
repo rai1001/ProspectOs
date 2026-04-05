@@ -229,9 +229,8 @@ export default function Pipeline() {
   const [kitLeadIds, setKitLeadIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(supabase as any).from('implementation_kits').select('lead_id').then(({ data }: { data: { lead_id: string }[] | null }) => {
-      if (data) setKitLeadIds(new Set(data.map(k => k.lead_id)))
+    supabase.from('implementation_kits').select('lead_id').then(({ data }) => {
+      if (data) setKitLeadIds(new Set(data.map(k => k.lead_id).filter((id): id is string => id !== null)))
     })
   }, [leads])
 
