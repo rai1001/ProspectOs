@@ -41,6 +41,9 @@ export function calculateScore(business: Business, rules: ScoringRule[]): number
           if (techs.includes('outdated_cms') || techs.includes('slow_loading')) score += rule.points
         }
         break
+      case 'no_review_responses':
+        if ((business as any).response_rate !== null && (business as any).response_rate !== undefined && (business as any).response_rate < 20) score += rule.points
+        break
     }
   }
 

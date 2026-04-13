@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Plus, Globe, Phone, Star, AlertCircle, Loader2, Flame, AtSign, Users, ExternalLink, LinkIcon } from 'lucide-react'
+import { Search, Plus, Globe, Phone, Star, AlertCircle, Loader2, Flame, AtSign, Users, ExternalLink, LinkIcon, MessageSquare } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { ScoreBadge } from '../components/ScoreBadge'
 import { SectorBadge } from '../components/SectorBadge'
@@ -288,6 +288,18 @@ Busca quejas sobre: atención al cliente mala, no cogen el teléfono, tardan en 
                           <Phone size={10} /> {result.data.phone}
                         </span>
                       )}
+                      {result.data.response_rate !== null && result.data.response_rate !== undefined && (
+                        <span className={cn(
+                          'inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs',
+                          result.data.response_rate === 0
+                            ? 'bg-red-500/10 text-red-300 border-red-500/20'
+                            : result.data.response_rate < 50
+                              ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                              : 'bg-green-500/10 text-green-300 border-green-500/20',
+                        )}>
+                          <MessageSquare size={10} /> {result.data.response_rate}% resp.
+                        </span>
+                      )}
                     </div>
 
                     {result.alreadyAdded ? (
@@ -333,10 +345,10 @@ Busca quejas sobre: atención al cliente mala, no cogen el teléfono, tardan en 
         <div>
           <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg p-4 mb-4">
             <p className="text-xs text-amber-400 mb-2 flex items-center gap-1.5">
-              <Flame size={12} /> Búsqueda profunda: extrae reseñas recientes y detecta negocios con quejas de atención al cliente.
+              <Flame size={12} /> Busqueda profunda: extrae resenas recientes, detecta quejas y muestra % de respuestas del propietario.
             </p>
             <p className="text-[10px] text-[#9ca3af] mb-3">
-              Coste mayor (~€0.05/búsqueda). Filtra automáticamente a negocios con rating {'<'} 4.5. Análisis con {provider.toUpperCase()}.
+              Coste mayor (~€0.05/busqueda). Negocios que no responden resenas aparecen primero (leads ReseaBot). Analisis con {provider.toUpperCase()}.
             </p>
             <label className="block text-xs text-[#9ca3af] mb-1.5 font-medium">Apify API Token</label>
             <input
@@ -407,7 +419,26 @@ Busca quejas sobre: atención al cliente mala, no cogen el teléfono, tardan en 
                           <Star size={10} /> {result.data.google_rating}
                         </span>
                       )}
+                      {result.data.response_rate !== null && result.data.response_rate !== undefined && (
+                        <span className={cn(
+                          'inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs',
+                          result.data.response_rate === 0
+                            ? 'bg-red-500/10 text-red-300 border-red-500/20'
+                            : result.data.response_rate < 50
+                              ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                              : 'bg-green-500/10 text-green-300 border-green-500/20',
+                        )}>
+                          <MessageSquare size={10} /> {result.data.response_rate}% resp.
+                        </span>
+                      )}
                     </div>
+
+                    {result.data.response_rate !== null && result.data.response_rate !== undefined && result.data.response_rate < 20 && (
+                      <div className="bg-purple-500/10 border border-purple-500/20 rounded px-3 py-2 mb-2">
+                        <p className="text-[10px] text-purple-300 uppercase tracking-wider mb-0.5">Lead ReseaBot</p>
+                        <p className="text-xs text-purple-200">{result.data.unresponded_reviews ?? '?'} de {(result.data.reviews?.length ?? 10)} resenas sin responder</p>
+                      </div>
+                    )}
 
                     {isPain && result.painAnalysis?.summary && (
                       <div className="bg-red-500/10 border border-red-500/20 rounded px-3 py-2 mb-3">

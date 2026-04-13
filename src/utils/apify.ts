@@ -7,6 +7,8 @@ interface ApifyReview {
   text?: string
   stars?: number
   publishedAtDate?: string
+  responseFromOwnerText?: string
+  responseFromOwnerDate?: string
 }
 
 interface ApifyResult {
@@ -25,7 +27,7 @@ interface ApifyResult {
 
 export type { ApifyReview }
 
-export type ApifySearchResult = Omit<BusinessInsert, 'sector'> & { sector: Sector; reviews?: ApifyReview[] }
+export type ApifySearchResult = Omit<BusinessInsert, 'sector'> & { sector: Sector; reviews?: ApifyReview[]; response_rate?: number | null; unresponded_reviews?: number | null }
 
 const SECTOR_KEYWORDS: Array<{ keywords: string[]; sector: Sector }> = [
   { keywords: ['restaurante', 'restaurant', 'comida', 'tapas', 'gastro', 'bar de tapas', 'pizzeria', 'hamburgues', 'sushi', 'marisqueria', 'cafeteria', 'cafè'], sector: 'Restauración' },
@@ -58,6 +60,16 @@ export function transformApifyResult(result: ApifyResult): ApifySearchResult {
   const mobilePhone = phone && isMobilePhone(phone) ? phone : null
   const landlinePhone = phone && !isMobilePhone(phone) ? phone : null
 
+  // Calculate review response rate from owner replies
+  const reviews = result.reviews ?? []
+  let response_rate: number | null = null
+  let unresponded_reviews: number | null = null
+  if (reviews.length > 0) {
+    const withResponse = reviews.filter(r => r.responseFromOwnerText)
+    response_rate = Math.round((withResponse.length / reviews.length) * 100)
+    unresponded_reviews = reviews.length - withResponse.length
+  }
+
   return {
     name: result.title ?? 'Sin nombre',
     sector: inferSector(rawCategory),
@@ -71,7 +83,9 @@ export function transformApifyResult(result: ApifyResult): ApifySearchResult {
     has_google_business: Boolean(result.placeId),
     place_id: result.placeId ?? null,
     source: 'apify',
-    reviews: result.reviews ?? [],
+    reviews,
+    response_rate,
+    unresponded_reviews,
   }
 }
 
@@ -163,10 +177,19 @@ export async function searchWithApifyDeep(
 
   const data: ApifyResult[] = await response.json()
 
-  // Filter: only places with rating < 4.5 (pain candidates)
+  // Transform all results (response_rate calculated inside)
+  // Sort by response_rate ASC so non-responders appear first
   return data
-    .filter(d => !d.totalScore || d.totalScore < 4.5)
     .map(transformApifyResult)
+    .sort((a, b) => {
+      // Nulls (no reviews) go last
+      const aRate = a.response_rate ?? null
+      const bRate = b.response_rate ?? null
+      if (aRate === null && bRate === null) return 0
+      if (aRate === null) return 1
+      if (bRate === null) return -1
+      return aRate - bRate
+    })
 }
 
 // ── Instagram Hashtag Scraper ─────────────────────────────────────

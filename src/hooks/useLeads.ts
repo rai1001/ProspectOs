@@ -41,27 +41,32 @@ export function useLeads() {
 
     if (!bizData) {
       // Strip fields not in the DB schema (e.g. reviews from Apify)
-      const { reviews, ...cleanBiz } = business as BusinessInsert & { reviews?: unknown }
-      const { data, error } = await supabase
-        .from('businesses')
-        .insert(cleanBiz)
+      const { reviews, response_rate, unresponded_reviews, ...cleanBiz } = business as BusinessInsert & { reviews?: unknown; response_rate?: number | null; unresponded_reviews?: number | null }
+      const insertData = {
+        ...cleanBiz,
+        ...(response_rate !== undefined && response_rate !== null ? { response_rate } : {}),
+        ...(unresponded_reviews !== undefined && unresponded_reviews !== null ? { unresponded_reviews } : {}),
+      }
+      const { data, error } = await (supabase
+        .from('businesses') as any)
+        .insert(insertData)
         .select()
         .single()
       if (error || !data) return null
-      bizData = data
+      bizData = data as Business
     }
 
-    const score = rules.length > 0 ? calculateScore(bizData, rules) : 0
+    const score = rules.length > 0 ? calculateScore(bizData!, rules) : 0
 
     const { data: leadData, error: leadError } = await supabase
       .from('leads')
-      .insert({ business_id: bizData.id, score })
+      .insert({ business_id: bizData!.id, score })
       .select()
       .single()
 
     if (leadError || !leadData) return null
 
-    const newLead: LeadWithBusiness = { ...leadData, business: bizData }
+    const newLead: LeadWithBusiness = { ...leadData, business: bizData! }
     setLeads(prev => [newLead, ...prev])
     return newLead
   }
