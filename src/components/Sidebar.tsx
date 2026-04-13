@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Radar, Columns3, FileText, Settings, Search, Wrench } from 'lucide-react'
+import { Radar, Columns3, FileText, Settings, Search, Wrench, MessageSquare } from 'lucide-react'
 import { cn } from '../lib/cn'
 
 const NAV = [
@@ -7,6 +7,7 @@ const NAV = [
   { to: '/pipeline', icon: Columns3, label: 'Pipeline' },
   { to: '/propuestas', icon: FileText, label: 'Propuestas' },
   { to: '/kit', icon: Wrench, label: 'Kit Generator' },
+  { to: '/reseabot', icon: MessageSquare, label: 'ReseaBot' },
 ]
 
 export function Sidebar({ onOpenCmd }: { onOpenCmd?: () => void }) {

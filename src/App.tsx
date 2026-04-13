@@ -10,6 +10,7 @@ import Pipeline from './pages/Pipeline'
 import Propuestas from './pages/Propuestas'
 import Settings from './pages/Settings'
 import Kit from './pages/Kit'
+import ReseaBotPage from './pages/ReseaBot'
 import Share from './pages/Share'
 import AuditoriaGratis from './pages/AuditoriaGratis'
 import { Loader2 } from 'lucide-react'
@@ -86,6 +87,7 @@ function AppShell() {
           <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/propuestas" element={<Propuestas />} />
           <Route path="/kit" element={<Kit />} />
+          <Route path="/reseabot" element={<ReseaBotPage />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
