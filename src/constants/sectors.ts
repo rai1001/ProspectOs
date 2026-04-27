@@ -30,3 +30,59 @@ export const SECTOR_COLORS: Record<Sector, string> = {
   'Academia / Formación': 'bg-green-500/20 text-green-300 border-green-500/30',
   'Otro': 'bg-zinc-500/20 text-zinc-300 border-zinc-500/30',
 }
+
+// Mapping sector → vertical Nevoxio por defecto
+export const SECTOR_TO_VERTICAL: Partial<Record<Sector, string>> = {
+  'Restauración':          'restaurantes',
+  'Hostelería':            'hoteles',
+  'Peluquería / Estética': 'peluquerias',
+  'Clínica / Salud':       'dentistas',
+  'Taller / Automoción':   'talleres',
+  'Comercio retail':       'comercios',
+  'Academia / Formación':  'academias',
+  // Inmobiliarias, Gestorías, Fisios, Estética, Autoescuelas: asignación manual
+}
+
+export const VERTICAL_SLUGS = [
+  'restaurantes', 'hoteles', 'dentistas', 'fisios',
+  'peluquerias', 'estetica', 'autoescuelas', 'academias',
+  'inmobiliarias', 'gestorias', 'talleres', 'comercios',
+] as const
+
+export type VerticalSlug = typeof VERTICAL_SLUGS[number]
+
+export const VERTICAL_LABELS: Record<VerticalSlug, string> = {
+  restaurantes:  'Restaurantes',
+  hoteles:       'Hoteles',
+  dentistas:     'Dentistas',
+  fisios:        'Fisios',
+  peluquerias:   'Peluquerías',
+  estetica:      'Estética',
+  autoescuelas:  'Autoescuelas',
+  academias:     'Academias',
+  inmobiliarias: 'Inmobiliarias',
+  gestorias:     'Gestorías',
+  talleres:      'Talleres',
+  comercios:     'Comercios',
+}
+
+export const VERTICAL_ICONS: Record<VerticalSlug, string> = {
+  restaurantes:  '🍽️',
+  hoteles:       '🏨',
+  dentistas:     '🦷',
+  fisios:        '💪',
+  peluquerias:   '✂️',
+  estetica:      '✨',
+  autoescuelas:  '🚗',
+  academias:     '🎓',
+  inmobiliarias: '🏠',
+  gestorias:     '📊',
+  talleres:      '🔧',
+  comercios:     '🛍️',
+}
+
+export const VERTICAL_SCORE_THRESHOLD = {
+  priority: 75,
+  approved: 50,
+  nurture: 25,
+} as const

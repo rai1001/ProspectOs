@@ -31,6 +31,7 @@ export type Database = {
           sector: string
           source: string
           technologies: Json | null
+          vertical: string | null
           website: string | null
           website_outdated: boolean | null
         }
@@ -50,6 +51,7 @@ export type Database = {
           sector: string
           source: string
           technologies?: Json | null
+          vertical?: string | null
           website?: string | null
           website_outdated?: boolean | null
         }
@@ -69,6 +71,7 @@ export type Database = {
           sector?: string
           source?: string
           technologies?: Json | null
+          vertical?: string | null
           website?: string | null
           website_outdated?: boolean | null
         }
@@ -237,6 +240,7 @@ export type Database = {
           enabled: boolean | null
           id: string
           points: number
+          vertical: string | null
         }
         Insert: {
           condition: string
@@ -244,6 +248,7 @@ export type Database = {
           enabled?: boolean | null
           id?: string
           points: number
+          vertical?: string | null
         }
         Update: {
           condition?: string
@@ -251,6 +256,7 @@ export type Database = {
           enabled?: boolean | null
           id?: string
           points?: number
+          vertical?: string | null
         }
         Relationships: []
       }

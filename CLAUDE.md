@@ -1,34 +1,50 @@
-# ProspectOS
+# ProspectOS — Herramienta de Prospeccion
 
-CRM de prospección de negocios locales. React 19 + Vite + Tailwind + Supabase + Groq/Gemini/Claude/OpenAI.
+## Que es
+CRM de prospeccion de negocios locales en A Coruna/Galicia. Detecta leads para ReseaBot (negocios que no responden resenas).
+
+## URLs
+- **Produccion:** https://prospect-os-teal.vercel.app/
+- **Repo:** https://github.com/rai1001/ProspectOs (master)
+- **Supabase:** nbgpaylmrohdqzgaxxqh (cuenta raisada1001@gmail.com)
+
+## Stack
+- React 19 + Vite + TypeScript strict + Tailwind CSS v3
+- Supabase (PostgreSQL + RLS + magic link auth)
+- Apify (compass~crawler-google-places) para Google Maps
+- Multi-LLM: Groq, Gemini, Claude, OpenAI (seleccionable en Settings)
+- Vercel auto-deploy desde GitHub push
+
+## Features principales
+- Radar: busqueda Google Maps + Instagram + manual + deep search
+- Pipeline: kanban 7 columnas drag & drop
+- Propuestas: genera con IA, 3 servicios x 3 tonos
+- Kit Generator: kits IA + web, pagina publica /share/:kitId
+- Auditoria Gratis: portal publico inbound leads
+- **Response Rate**: detecta negocios que no responden resenas (leads ReseaBot)
 
 ## Skill routing
 
 When the user's request matches an available skill, ALWAYS invoke it using the Skill
-tool as your FIRST action. Do NOT answer directly, do NOT use other tools first.
-The skill has specialized workflows that produce better results than ad-hoc answers.
+tool as your FIRST action.
 
-Key routing rules:
-- Product ideas, "is this worth building", brainstorming → invoke office-hours
-- Bugs, errors, "why is this broken", 500 errors → invoke investigate
-- Ship, deploy, push, create PR → invoke ship
-- QA, test the site, find bugs → invoke qa
-- Code review, check my diff → invoke review
-- Update docs after shipping → invoke document-release
-- Weekly retro → invoke retro
-- Design system, brand → invoke design-consultation
-- Visual audit, design polish → invoke design-review
-- Architecture review → invoke plan-eng-review
-- Save progress, checkpoint, resume → invoke checkpoint
-- Code quality, health check → invoke health
+- Bugs, errors → invoke investigate
+- Ship, deploy, push → invoke ship
+- QA, test the site → invoke qa
+- Code review → invoke review
 
 ## Testing
-
 - Run: `npx vitest run` (test dir: `test/`)
-- See TESTING.md for full conventions
-- 100% test coverage is the goal — tests make vibe coding safe
-- When writing new functions, write a corresponding test
-- When fixing a bug, write a regression test
-- When adding error handling, write a test that triggers the error
-- When adding a conditional (if/else, switch), write tests for BOTH paths
-- Never commit code that makes existing tests fail
+- 100% test coverage goal
+- Write tests for new functions and bug fixes
+
+## Reglas
+- Responder en espanol
+- No anadir dependencias sin preguntar
+- Supabase client singleton en lib/supabase.ts
+- Variables de entorno en .env.local
+- API keys LLM en localStorage
+
+## Relacion con otros proyectos
+- Alimenta leads para ReseaBot (C:\APLICACIONES\resenabot\)
+- Genera kits para Nevoxio (C:\APLICACIONES\agencia\constructor\)
